@@ -1,16 +1,17 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Matching, Review, MOCK_TUTORS, INITIAL_MATCHINGS, INITIAL_TUTOR_MATCHINGS, MOCK_REVIEWS } from '../mockData';
+import type { StudentMatching, Review } from '../types';
+import { TUTORS, REVIEWS, MY_MATCHINGS_STUDENT, MY_MATCHINGS_TUTOR } from '../data/mockData';
 
 export type Role = 'GUEST' | 'STUDENT' | 'TUTOR';
 
 interface UserContextType {
   role: Role;
   setRole: (role: Role) => void;
-  matchings: Matching[];
+  matchings: StudentMatching[];
   addMatching: (tutorId: number, message: string, schedule: string) => void;
-  updateMatchingStatus: (id: number, status: 'ACCEPTED' | 'REJECTED') => void;
+  updateMatchingStatus: (id: number, status: 'accepted' | 'rejected') => void;
   reviews: Review[];
   addReview: (tutorId: number, rating: number, content: string) => void;
   logout: () => void;
@@ -20,7 +21,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<Role>('GUEST');
-  const [matchings, setMatchings] = useState<Matching[]>([]);
+  const [matchings, setMatchings] = useState<StudentMatching[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [mounted, setMounted] = useState(false);
 
@@ -36,17 +37,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setMatchings(JSON.parse(savedMatchings));
     } else {
       // Merge initial matchings for demo
-      const merged = [...INITIAL_MATCHINGS, ...INITIAL_TUTOR_MATCHINGS];
-      setMatchings(merged);
-      localStorage.setItem('tm_matchings', JSON.stringify(merged));
+      setMatchings(MY_MATCHINGS_STUDENT);
+      localStorage.setItem('tm_matchings', JSON.stringify(MY_MATCHINGS_STUDENT));
     }
 
     const savedReviews = localStorage.getItem('tm_reviews');
     if (savedReviews) {
       setReviews(JSON.parse(savedReviews));
     } else {
-      setReviews(MOCK_REVIEWS);
-      localStorage.setItem('tm_reviews', JSON.stringify(MOCK_REVIEWS));
+      setReviews(REVIEWS);
+      localStorage.setItem('tm_reviews', JSON.stringify(REVIEWS));
     }
 
     setMounted(true);
@@ -58,19 +58,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addMatching = (tutorId: number, message: string, schedule: string) => {
-    const tutor = MOCK_TUTORS.find(t => t.id === tutorId);
+    const tutor = TUTORS.find(t => t.id === tutorId);
     if (!tutor) return;
 
-    const newMatching: Matching = {
+    const newMatching: StudentMatching = {
       id: Date.now(),
-      tutorId,
-      tutorName: tutor.name,
-      studentName: 'You',
+      tutor: tutor.name,
       subject: tutor.subject,
-      status: 'PENDING',
+      status: 'pending',
       message,
-      schedule,
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      time: schedule,
+      date: new Date().toISOString().split('T')[0]
     };
 
     const updated = [newMatching, ...matchings];
@@ -78,7 +76,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('tm_matchings', JSON.stringify(updated));
   };
 
-  const updateMatchingStatus = (id: number, status: 'ACCEPTED' | 'REJECTED') => {
+  const updateMatchingStatus = (id: number, status: 'accepted' | 'rejected') => {
     const updated = matchings.map(m => {
       if (m.id === id) {
         return { ...m, status };
@@ -89,11 +87,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('tm_matchings', JSON.stringify(updated));
   };
 
-  const addReview = (tutorId: number, rating: number, content: string) => {
+  const addReview = (_tutorId: number, rating: number, content: string) => {
     const newReview: Review = {
       id: Date.now(),
-      tutorId,
-      studentName: role === 'STUDENT' ? 'You' : 'Anonymous Student',
+      student: role === 'STUDENT' ? '나' : '익명 학생',
       rating,
       content,
       date: new Date().toISOString().split('T')[0]
