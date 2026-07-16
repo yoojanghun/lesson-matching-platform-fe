@@ -1,5 +1,26 @@
-export type Page = "home" | "tutors" | "tutor-detail" | "login" | "signup" | "my-matchings" | "matching-request";
+export type Page =
+  | "home"
+  | "tutors"
+  | "tutor-detail"
+  | "signup"
+  | "login"
+  | "my-matchings"
+  | "matching-request"
+  | "booking";
+
 export type Role = "student" | "tutor" | null;
+
+export interface LessonOption {
+  label: string;
+  duration: string;
+  price: number;
+}
+
+export interface Career {
+  period: string;
+  title: string;
+  org: string;
+}
 
 export interface Tutor {
   id: number;
@@ -12,10 +33,11 @@ export interface Tutor {
   intro: string;
   avatar: string;
   available: boolean;
+  // 상세 정보 (선택)
   fullIntro?: string;
   education?: string[];
-  careers?: { period: string; title: string; org: string }[];
-  lessonOptions?: { label: string; duration: string; price: number }[];
+  careers?: Career[];
+  lessonOptions?: LessonOption[];
   lessonStyle?: string[];
   totalLessons?: number;
   responseRate?: number;
@@ -38,7 +60,7 @@ export interface StudentMatching {
   subject: string;
   date: string;
   time: string;
-  status: "pending" | "accepted" | "rejected";
+  status: string;
   message: string;
 }
 
@@ -48,7 +70,7 @@ export interface TutorMatching {
   subject: string;
   date: string;
   time: string;
-  status: "pending" | "accepted" | "rejected";
+  status: string;
   message: string;
 }
 
@@ -57,11 +79,11 @@ export interface LessonBooking {
   tutor: string;
   subject: string;
   avatar: string;
-  lessonDate: string;
-  lessonDay: string;
-  startTime: string;
-  endTime: string;
+  lessonDate: string;      // "2026-07-28"
+  lessonDay: string;       // "월"
+  startTime: string;       // "10:30"
+  endTime: string;         // "11:30"
   price: number;
   status: "pending" | "confirmed" | "rejected";
-  requestedAt: string;
+  requestedAt: string;     // 예약 신청 일시
 }

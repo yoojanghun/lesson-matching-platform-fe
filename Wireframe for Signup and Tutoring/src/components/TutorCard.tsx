@@ -1,21 +1,22 @@
-"use client";
 import type { Tutor } from "../types";
-import Image from "next/image";
 import StarRow from "./StarRow";
 
-export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: () => void }) {
+interface Props {
+  tutor: Tutor;
+  onClick: () => void;
+}
+
+export default function TutorCard({ tutor, onClick }: Props) {
   return (
     <div
       onClick={onClick}
-      className="border border-border rounded-xl p-5 cursor-pointer bg-card"
+      className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group"
     >
       <div className="flex items-start gap-4">
         <div className="relative shrink-0">
-          <Image
+          <img
             src={tutor.avatar}
             alt={tutor.name}
-            width={56}
-            height={56}
             className="w-14 h-14 rounded-full object-cover bg-muted"
           />
           {tutor.available && (

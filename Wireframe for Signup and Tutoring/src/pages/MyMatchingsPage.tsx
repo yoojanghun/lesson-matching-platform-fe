@@ -1,10 +1,13 @@
-"use client";
 import { useState } from "react";
 import { CheckCircle2, XCircle, GraduationCap, User, ChevronRight, Calendar, Clock } from "lucide-react";
+import type { Role } from "../types";
 import { MY_MATCHINGS_STUDENT, MY_MATCHINGS_TUTOR, MY_LESSON_BOOKINGS, TUTORS } from "../data/mockData";
 import StatusBadge from "../components/StatusBadge";
-import { useUser } from "../components/UserContext";
-import BookingPage from "./BookingPage";
+
+interface Props {
+  role: Role;
+  onOpenBooking: (matchingId: number) => void;
+}
 
 // 레슨 예약 상태 배지
 function BookingStatusBadge({ status }: { status: "pending" | "confirmed" | "rejected" }) {
@@ -27,30 +30,15 @@ function formatDate(dateStr: string, day: string) {
   return `${y}년 ${m}월 ${d}일 (${day})`;
 }
 
-export default function MyMatchingsPage() {
-  const { role } = useUser();
-  const isTutor = role === "TUTOR";
+export default function MyMatchingsPage({ role, onOpenBooking }: Props) {
+  const isTutor = role === "tutor";
 
   // 학생: "보낸 요청" | "레슨 예약"   /   튜터: "받은 요청" 고정
   const [activeTab, setActiveTab] = useState<"requests" | "bookings">("requests");
-  const [bookingMatchingId, setBookingMatchingId] = useState<number | null>(null);
 
   const sentMatchings = MY_MATCHINGS_STUDENT;
   const tutorMatchings = MY_MATCHINGS_TUTOR;
   const lessonBookings = MY_LESSON_BOOKINGS;
-
-  if (bookingMatchingId !== null) {
-    return (
-      <BookingPage 
-        matchingId={bookingMatchingId} 
-        onBack={() => setBookingMatchingId(null)} 
-        onConfirm={() => {
-          setBookingMatchingId(null);
-          setActiveTab("bookings");
-        }} 
-      />
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -106,7 +94,7 @@ export default function MyMatchingsPage() {
             return (
               <div
                 key={m.id}
-                onClick={isAccepted ? () => setBookingMatchingId(m.id) : undefined}
+                onClick={isAccepted ? () => onOpenBooking(m.id) : undefined}
                 className={`bg-card border border-border rounded-xl p-5 transition-all ${
                   isAccepted ? "cursor-pointer hover:border-primary/40 hover:shadow-md" : ""
                 }`}
@@ -138,6 +126,12 @@ export default function MyMatchingsPage() {
                 <p className="mt-3 text-sm text-foreground bg-muted rounded-lg px-3 py-2 leading-relaxed">
                   "{m.message}"
                 </p>
+                {isAccepted && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    <CheckCircle2 size={13} className="shrink-0" />
+                    승인되었습니다! 카드를 클릭해 레슨 날짜와 시간을 예약하세요.
+                  </div>
+                )}
               </div>
             );
           })}
@@ -190,6 +184,25 @@ export default function MyMatchingsPage() {
                 {/* 신청 일시 */}
                 <p className="mt-2.5 text-xs text-muted-foreground">예약 신청: {b.requestedAt}</p>
 
+                {/* 상태별 안내 */}
+                {b.status === "confirmed" && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    <CheckCircle2 size={13} className="shrink-0" />
+                    튜터가 레슨을 확정했습니다. 레슨 당일 시간에 맞춰 준비해 주세요!
+                  </div>
+                )}
+                {b.status === "pending" && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <Clock size={13} className="shrink-0" />
+                    튜터의 확정을 기다리고 있습니다.
+                  </div>
+                )}
+                {b.status === "rejected" && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    <XCircle size={13} className="shrink-0" />
+                    해당 시간에 레슨이 어렵다고 합니다. 다른 시간으로 다시 예약해 보세요.
+                  </div>
+                )}
               </div>
             ))
           )}

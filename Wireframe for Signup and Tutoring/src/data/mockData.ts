@@ -15,23 +15,25 @@ export const TUTORS: Tutor[] = [
   {
     id: 1,
     name: "김지수",
-    subject: "피아노 · 음악이론",
+    subject: "수학 · 통계",
     rating: 4.9,
     reviews: 87,
     price: 40000,
-    tags: ["클래식", "재즈피아노", "입시"],
-    intro: "한예종 피아노과 출신. 기초부터 연주회 준비까지 맞춤 지도합니다.",
+    tags: ["SAT", "수능", "미적분"],
+    intro: "서울대 수학과 출신. 개념부터 심화까지 맞춤 지도합니다.",
     avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=80&h=80&fit=crop&auto=format",
     available: true,
     fullIntro:
-      "안녕하세요, 피아노 튜터 김지수입니다. 한국예술종합학교 피아노과를 졸업하고 6년간 레슨 및 연주 활동을 해왔습니다. 클래식 기초부터 재즈 즉흥연주, 입시 준비까지 다양한 레슨이 가능합니다. 첫 수업 전 무료 상담을 통해 학생의 수준과 목표에 맞는 커리큘럼을 설계해 드립니다.",
+      "안녕하세요, 수학 튜터 김지수입니다. 서울대학교 수학과를 졸업하고 6년간 과외 및 학원 강의를 해왔습니다. 수포자도 수학을 좋아하게 만드는 것이 제 목표예요. 단순 문제풀이보다는 개념의 본질을 이해하는 방식으로 가르쳐, 처음 보는 문제도 스스로 풀 수 있는 힘을 길러드립니다. 수능, 내신, SAT, 대학 수학 등 다양한 목적의 수업이 가능하며, 첫 수업 전 무료 상담을 통해 학생의 수준과 목표에 맞는 커리큘럼을 설계해 드립니다.",
     education: [
-      "한국예술종합학교 피아노과 학사 졸업 (2016–2020)",
-      "쇼팽 국제 피아노 콩쿠르 입상 (2019)",
+      "서울대학교 수학과 학사 졸업 (2016–2020)",
+      "서울대학교 통계학과 석사 과정 수료 (2020–2022)",
+      "한국수학올림피아드(KMO) 은상 수상 (2015)",
     ],
     careers: [
-      { period: "2022.03 – 현재", title: "피아노 전문 튜터", org: "프리랜서" },
-      { period: "2020.09 – 2022.02", title: "피아노 강사", org: "예원 음악원" },
+      { period: "2022.03 – 현재", title: "수학·통계 전문 과외 튜터", org: "프리랜서" },
+      { period: "2020.09 – 2022.02", title: "수학 강사", org: "대치동 메가스터디 학원" },
+      { period: "2019.03 – 2020.06", title: "수학 조교", org: "서울대학교 수학과" },
     ],
     lessonOptions: [
       { label: "체험 수업", duration: "50분", price: 30000 },
@@ -39,10 +41,10 @@ export const TUTORS: Tutor[] = [
       { label: "심화 수업", duration: "90분", price: 55000 },
     ],
     lessonStyle: [
-      "기초 테크닉 → 레퍼토리 → 실전 연주 순서로 단계적 학습",
-      "매 수업 후 연습 방향 피드백 제공",
+      "개념 → 유형 → 실전 순서로 단계적 학습",
+      "매 수업 후 맞춤 숙제 제공 및 다음 수업 피드백",
       "카카오톡 질문 24시간 이내 답변",
-      "월 1회 소규모 연주회 참여 기회 제공",
+      "월 1회 테스트로 성취도 점검",
     ],
     totalLessons: 342,
     responseRate: 98,
@@ -61,11 +63,6 @@ export const TUTORS: Tutor[] = [
     intro: "버클리음대 출신. 입문부터 무대 퍼포먼스까지 함께합니다.",
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&auto=format",
     available: true,
-    onlineAvailable: true,
-    location: "서울 마포구 (대면 가능)",
-    responseTime: "평균 2시간",
-    responseRate: 95,
-    totalLessons: 210,
   },
   {
     id: 3,
@@ -90,11 +87,6 @@ export const TUTORS: Tutor[] = [
     intro: "한국예술종합학교 졸업. 입시부터 취미까지 지도합니다.",
     avatar: "https://images.unsplash.com/photo-1545167622-3a6ac756afa4?w=80&h=80&fit=crop&auto=format",
     available: true,
-    onlineAvailable: false,
-    location: "서울 서초구 (대면 가능)",
-    responseTime: "평균 3시간",
-    responseRate: 92,
-    totalLessons: 178,
   },
   {
     id: 5,
@@ -107,11 +99,6 @@ export const TUTORS: Tutor[] = [
     intro: "SM엔터 출신 보컬트레이너. 호흡부터 무대 매너까지.",
     avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&h=80&fit=crop&auto=format",
     available: true,
-    onlineAvailable: true,
-    location: "서울 강동구 (대면 가능)",
-    responseTime: "평균 1시간",
-    responseRate: 99,
-    totalLessons: 256,
   },
   {
     id: 6,
@@ -124,11 +111,6 @@ export const TUTORS: Tutor[] = [
     intro: "전직 세션 드러머. 리듬감과 다이나믹을 함께 잡아드립니다.",
     avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&auto=format",
     available: true,
-    onlineAvailable: false,
-    location: "서울 노원구 (대면 가능)",
-    responseTime: "평균 4시간",
-    responseRate: 88,
-    totalLessons: 142,
   },
   {
     id: 7,
@@ -141,11 +123,6 @@ export const TUTORS: Tutor[] = [
     intro: "Logic Pro · Ableton 전문. 나만의 음악을 만들고 싶다면.",
     avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&auto=format",
     available: true,
-    onlineAvailable: true,
-    location: "서울 용산구 (대면 가능)",
-    responseTime: "평균 2시간",
-    responseRate: 97,
-    totalLessons: 89,
   },
   {
     id: 8,
@@ -158,31 +135,28 @@ export const TUTORS: Tutor[] = [
     intro: "재즈피아노 전공자. 클래식 기초부터 자유로운 즉흥연주까지.",
     avatar: "https://images.unsplash.com/photo-1463453091185-61582044d556?w=80&h=80&fit=crop&auto=format",
     available: false,
-    onlineAvailable: true,
-    location: "서울 성동구 (대면 가능)",
-    responseTime: "평균 5시간",
-    responseRate: 90,
-    totalLessons: 195,
   },
 ];
 
 export const REVIEWS: Review[] = [
-  { id: 1, student: "김OO", rating: 5, date: "2026-06-28", content: "정말 친절하고 설명이 명확해요. 덕분에 연주 실력이 많이 늘었습니다!" },
-  { id: 2, student: "이OO", rating: 5, date: "2026-06-15", content: "기초부터 차근차근 잡아주셔서 자신감이 생겼어요. 강력 추천합니다." },
-  { id: 3, student: "박OO", rating: 4, date: "2026-06-01", content: "숙제 피드백이 빨라서 좋아요. 시간 약속도 철저히 지키십니다." },
-  { id: 4, student: "최OO", rating: 5, date: "2026-05-20", content: "어려운 곡도 쉽게 풀어주셔서 이해가 잘 됩니다." },
-  { id: 5, student: "한OO", rating: 4, date: "2026-05-10", content: "수업 준비를 꼼꼼히 하시는 게 느껴져요. 만족스럽습니다." },
+  { id: 1, student: "김OO", rating: 5, date: "2026-06-28", content: "정말 친절하고 설명이 명확해요. 덕분에 모의고사 성적이 많이 올랐습니다! 수능 수학 2등급에서 1등급으로 올랐어요." },
+  { id: 2, student: "이OO", rating: 5, date: "2026-06-15", content: "개념부터 차근차근 잡아주셔서 자신감이 생겼어요. 미적분을 이렇게 쉽게 이해한 건 처음이에요. 강력 추천합니다." },
+  { id: 3, student: "박OO", rating: 4, date: "2026-06-01", content: "숙제 피드백이 빨라서 좋아요. 시간 약속도 철저히 지키십니다. 카톡 질문에도 빠르게 답해주셔서 공부하다 막힐 때 도움이 많이 됩니다." },
+  { id: 4, student: "최OO", rating: 5, date: "2026-05-20", content: "어려운 문제도 여러 풀이법으로 쉽게 설명해 주셔서 이해가 잘 됩니다. 내신 시험 전에 집중적으로 도와주셔서 A+ 받았어요!" },
+  { id: 5, student: "한OO", rating: 4, date: "2026-05-10", content: "수업 준비를 꼼꼼히 하시는 게 느껴져요. 제 약점 파트를 정확히 짚어서 집중 훈련시켜 주셔서 만족스럽습니다." },
+  { id: 6, student: "정OO", rating: 5, date: "2026-04-22", content: "SAT Math 준비를 도와주셨는데 800점 만점을 받았습니다! 선생님 덕분에 목표 달성했어요." },
+  { id: 7, student: "윤OO", rating: 5, date: "2026-04-05", content: "대학 통계학 과목이 어려워서 찾아갔는데, 쉬운 언어로 설명해 주셔서 기말고사에서 좋은 성적을 받을 수 있었습니다." },
 ];
 
 export const MY_MATCHINGS_STUDENT: StudentMatching[] = [
-  { id: 1, tutor: "김지수", subject: "피아노 · 음악이론", date: "2026-07-05", time: "토요일 오후 2시", status: "pending", message: "피아노 입시 준비가 필요합니다." },
-  { id: 2, tutor: "박민준", subject: "기타 · 우쿨렐레", date: "2026-06-30", time: "평일 저녁 7시", status: "accepted", message: "통기타 핑거스타일 배우고 싶습니다." },
-  { id: 3, tutor: "이수연", subject: "바이올린 · 비올라", date: "2026-06-20", time: "주말 오전 10시", status: "rejected", message: "바이올린 입문 레슨 신청합니다." },
+  { id: 1, tutor: "김지수", subject: "수학 · 통계", date: "2026-07-05", time: "토요일 오후 2시", status: "pending", message: "수능 수학 집중 대비가 필요합니다." },
+  { id: 2, tutor: "박민준", subject: "영어 · 토익", date: "2026-06-30", time: "평일 저녁 7시", status: "accepted", message: "토익 900점 목표로 준비 중입니다." },
+  { id: 3, tutor: "이수연", subject: "파이썬 · 알고리즘", date: "2026-06-20", time: "주말 오전 10시", status: "rejected", message: "코딩테스트 준비를 도와주세요." },
 ];
 
 export const MY_MATCHINGS_TUTOR: TutorMatching[] = [
-  { id: 1, student: "김민수", subject: "피아노 · 음악이론", date: "2026-07-06", time: "일요일 오후 3시", status: "pending", message: "피아노 기초부터 배우고 싶어요." },
-  { id: 2, student: "이지영", subject: "피아노 · 음악이론", date: "2026-07-02", time: "수요일 오후 5시", status: "accepted", message: "재즈피아노 즉흥연주 배우고 싶습니다." },
+  { id: 1, student: "김민수", subject: "수학 · 통계", date: "2026-07-06", time: "일요일 오후 3시", status: "pending", message: "수능 수학 개념 정리가 필요해요." },
+  { id: 2, student: "이지영", subject: "수학 · 통계", date: "2026-07-02", time: "수요일 오후 5시", status: "accepted", message: "미적분 심화 문제 풀이 원합니다." },
 ];
 
 export const MY_LESSON_BOOKINGS: LessonBooking[] = [
