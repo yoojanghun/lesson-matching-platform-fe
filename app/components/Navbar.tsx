@@ -5,16 +5,24 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useUser } from "./UserContext";
 
-const NAV_ITEMS = [
+const NAV_ITEMS_STUDENT = [
   { label: "홈", path: "/" },
   { label: "튜터 찾기", path: "/tutors" },
   { label: "내 매칭", path: "/my-matchings" },
+];
+
+const NAV_ITEMS_TUTOR = [
+  { label: "홈", path: "/" },
+  { label: "내 매칭", path: "/my-matchings" },
+  { label: "스케줄 관리", path: "/schedule" },
 ];
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { role, logout } = useUser();
   const pathname = usePathname();
+
+  const navItems = role === "TUTOR" ? NAV_ITEMS_TUTOR : NAV_ITEMS_STUDENT;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border backdrop-blur" style={{ backgroundColor: "rgba(255,255,255,0.97)" }}>
@@ -25,7 +33,7 @@ export default function Navbar() {
 
         {/* Desktop nav */}
         <nav className="hidden sm:flex items-center gap-1">
-          {NAV_ITEMS.map(({ label, path }) => (
+          {navItems.map(({ label, path }) => (
             <Link
               key={path}
               href={path}
@@ -48,15 +56,14 @@ export default function Navbar() {
           {role !== "GUEST" ? (
             <div className="flex items-center gap-2">
               <span
-                className="text-xs px-2 py-1 rounded-full"
-                style={{ color: "#6b748a", border: "1px solid rgba(30,58,95,0.12)" }}
+                className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                style={{ backgroundColor: "#e8f0fb", color: "#1e3a5f" }}
               >
                 {role === "STUDENT" ? "학생" : "튜터"}
               </span>
               <button
                 onClick={logout}
-                className="text-xs cursor-pointer"
-                style={{ color: "#6b748a" }}
+                className="text-xs cursor-pointer text-muted-foreground hover:text-foreground"
               >
                 로그아웃
               </button>
@@ -97,7 +104,7 @@ export default function Navbar() {
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="sm:hidden border-t border-border px-4 py-3 space-y-1" style={{ backgroundColor: "#ffffff" }}>
-          {NAV_ITEMS.map(({ label, path }) => (
+          {navItems.map(({ label, path }) => (
             <Link
               key={path}
               href={path}
@@ -108,21 +115,32 @@ export default function Navbar() {
             </Link>
           ))}
           <div className="pt-2 flex gap-2">
-            <Link
-              href="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex-1 py-2 border border-border rounded-lg text-sm text-foreground text-center inline-block"
-            >
-              로그인
-            </Link>
-            <Link
-              href="/signup"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex-1 py-2 rounded-lg text-sm font-semibold text-center inline-block"
-              style={{ backgroundColor: "#1e3a5f", color: "#ffffff" }}
-            >
-              회원가입
-            </Link>
+            {role !== "GUEST" ? (
+              <button
+                onClick={() => { logout(); setMobileMenuOpen(false); }}
+                className="flex-1 py-2 border border-border rounded-lg text-sm text-foreground text-center"
+              >
+                로그아웃
+              </button>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex-1 py-2 border border-border rounded-lg text-sm text-foreground text-center inline-block"
+                >
+                  로그인
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-center inline-block"
+                  style={{ backgroundColor: "#1e3a5f", color: "#ffffff" }}
+                >
+                  회원가입
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

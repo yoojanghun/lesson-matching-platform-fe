@@ -1,56 +1,174 @@
 "use client";
 import { useState } from "react";
-import { CheckCircle2, XCircle, GraduationCap, User, ChevronRight, Calendar, Clock } from "lucide-react";
-import { MY_MATCHINGS_STUDENT, MY_MATCHINGS_TUTOR, MY_LESSON_BOOKINGS, TUTORS } from "../data/mockData";
+import {
+  CheckCircle2, GraduationCap, User,
+  ChevronRight, ChevronDown, CreditCard, Calendar, Clock, XCircle
+} from "lucide-react";
+import {
+  MY_MATCHINGS_STUDENT, MY_MATCHINGS_TUTOR,
+  MY_LESSON_BOOKINGS, MY_PAYMENTS, TUTORS,
+} from "../data/mockData";
+import type { PaymentItem } from "../types";
 import StatusBadge from "../components/StatusBadge";
+import PaymentModal from "../components/PaymentModal";
+import MiniCalendar, { type CalEvent } from "../components/MiniCalendar";
 import { useUser } from "../components/UserContext";
 import BookingPage from "./BookingPage";
 
-// 레슨 예약 상태 배지
 function BookingStatusBadge({ status }: { status: "pending" | "confirmed" | "rejected" }) {
   const map = {
-    pending:   { label: "대기 중",  cls: "bg-amber-50 text-amber-700 border-amber-200",     icon: <Clock size={12} /> },
-    confirmed: { label: "확정됨",   cls: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle2 size={12} /> },
-    rejected:  { label: "거절됨",   cls: "bg-red-50 text-red-600 border-red-200",            icon: <XCircle size={12} /> },
+    pending:   { label: "대기 중", cls: "bg-amber-100 text-amber-700" },
+    confirmed: { label: "확정됨",  cls: "bg-emerald-100 text-emerald-700" },
+    rejected:  { label: "거절됨",  cls: "bg-red-100 text-red-600" },
   };
-  const { label, cls, icon } = map[status];
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${cls}`}>
-      {icon} {label}
-    </span>
-  );
+  const { label, cls } = map[status];
+  return <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${cls}`}>{label}</span>;
 }
 
-// 날짜 포맷 "2026-07-28" → "2026년 7월 28일"
-function formatDate(dateStr: string, day: string) {
+function fmtDate(dateStr: string, day: string) {
   const [y, m, d] = dateStr.split("-").map(Number);
   return `${y}년 ${m}월 ${d}일 (${day})`;
 }
+
+function ExpandableMessage({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="text-left w-full group cursor-pointer">
+      <p className={`text-xs text-muted-foreground leading-relaxed ${open ? "" : "truncate"}`}>{text}</p>
+      <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/60 group-hover:text-muted-foreground mt-0.5 transition-colors">
+        {open ? "접기" : "더 보기"}
+        <ChevronDown size={10} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </span>
+    </button>
+  );
+}
+
+function DateDetail({
+  date,
+  items,
+  emptyMsg,
+}: {
+  date: string;
+  items: { avatar: string; tutor: string; subject: string; startTime: string; endTime: string; badge: React.ReactNode }[];
+  emptyMsg: string;
+}) {
+  const WDAYS = ["일","월","화","수","목","금","토"];
+  const dow = WDAYS[new Date(date).getDay()];
+  const [y, m, d] = date.split("-").map(Number);
+  return (
+    <div className="bg-card rounded-2xl border border-border shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-muted/40">
+        <p className="text-sm font-bold text-foreground">{y}년 {m}월 {d}일 ({dow})</p>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-8">{emptyMsg}</p>
+      ) : (
+        items.map((it, i) => (
+          <div key={i} className={`flex items-center gap-4 px-5 py-4 ${i !== items.length-1 ? "border-b border-border" : ""}`}>
+            <img src={it.avatar} alt={it.tutor} className="w-10 h-10 rounded-full object-cover shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-bold text-foreground">{it.tutor}</p>
+                <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{it.subject}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                <Clock size={11} /> {it.startTime} – {it.endTime} (1시간)
+              </p>
+            </div>
+            <div className="shrink-0">{it.badge}</div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
 
 export default function MyMatchingsPage() {
   const { role } = useUser();
   const isTutor = role === "TUTOR";
 
-  // 학생: "보낸 요청" | "레슨 예약"   /   튜터: "받은 요청" 고정
-  const [activeTab, setActiveTab] = useState<"requests" | "bookings">("requests");
+  const [activeTab, setActiveTab] = useState<"requests" | "bookings" | "payments">("requests");
   const [bookingMatchingId, setBookingMatchingId] = useState<number | null>(null);
+  const [payments, setPayments] = useState<PaymentItem[]>(MY_PAYMENTS);
+  const [payingItem, setPayingItem] = useState<PaymentItem | null>(null);
+
+  const todayStr = (() => {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
+  })();
+  const [bookingSelDate, setBookingSelDate] = useState<string | null>(todayStr);
+  const [paymentSelDate, setPaymentSelDate] = useState<string | null>(todayStr);
 
   const sentMatchings = MY_MATCHINGS_STUDENT;
   const tutorMatchings = MY_MATCHINGS_TUTOR;
   const lessonBookings = MY_LESSON_BOOKINGS;
+  const unpaidCount = payments.filter((p) => p.status === "unpaid").length;
+
+  const handlePaid = (id: number) => {
+    const now = new Date();
+    const paidAt = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+    setPayments((prev) => prev.map((p) => p.id === id ? { ...p, status: "paid", paidAt } : p));
+  };
+
+  const bookingEvents: CalEvent[] = lessonBookings
+    .filter((b) => b.status !== "rejected")
+    .map((b) => ({
+      date: b.lessonDate,
+      label: `${b.startTime} ${b.tutor}`,
+      color: b.status === "confirmed" ? "blue" : "amber",
+    }));
+
+  const paymentEvents: CalEvent[] = payments.map((p) => ({
+    date: p.lessonDate,
+    label: `${p.startTime} ${p.tutor}`,
+    color: p.status === "paid" ? "green" : "amber",
+  }));
+
+  const bookingDateItems = bookingSelDate
+    ? lessonBookings
+        .filter((b) => b.lessonDate === bookingSelDate && b.status !== "rejected")
+        .map((b) => ({
+          avatar: b.avatar, tutor: b.tutor, subject: b.subject,
+          startTime: b.startTime, endTime: b.endTime,
+          badge: <BookingStatusBadge status={b.status} />,
+        }))
+    : [];
+
+  const paymentDateItems = paymentSelDate
+    ? payments
+        .filter((p) => p.lessonDate === paymentSelDate)
+        .map((p) => ({
+          avatar: p.avatar, tutor: p.tutor, subject: p.subject,
+          startTime: p.startTime, endTime: p.endTime,
+          badge: p.status === "paid"
+            ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><CheckCircle2 size={11}/> 결제 완료</span>
+            : <button onClick={() => { const item = payments.find(x=>x.lessonDate===paymentSelDate); if(item) setPayingItem(item); }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer">
+                <CreditCard size={11}/> 결제하기
+              </button>,
+        }))
+    : [];
 
   if (bookingMatchingId !== null) {
     return (
-      <BookingPage 
-        matchingId={bookingMatchingId} 
-        onBack={() => setBookingMatchingId(null)} 
+      <BookingPage
+        matchingId={bookingMatchingId}
+        onBack={() => setBookingMatchingId(null)}
         onConfirm={() => {
           setBookingMatchingId(null);
           setActiveTab("bookings");
-        }} 
+        }}
       />
     );
   }
+
+  const TABS = [
+    { key: "requests" as const,  label: "보낸 요청" },
+    { key: "bookings" as const,  label: "레슨 예약" },
+    { key: "payments" as const,  label: "결제", badge: unpaidCount },
+  ];
 
   return (
     <div className="space-y-6">
@@ -61,28 +179,17 @@ export default function MyMatchingsPage() {
         </p>
       </div>
 
-      {/* ── 탭 (학생만) ── */}
       {!isTutor && (
         <div className="flex gap-1 bg-muted p-1 rounded-xl w-fit">
-          {([
-            { key: "requests", label: "보낸 요청" },
-            { key: "bookings", label: "레슨 예약" },
-          ] as const).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === key
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
+          {TABS.map(({ key, label, badge }) => (
+            <button key={key} onClick={() => setActiveTab(key)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}>
               {label}
-              {key === "bookings" && lessonBookings.length > 0 && (
-                <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                  activeTab === key ? "bg-primary text-white" : "bg-muted-foreground/20 text-muted-foreground"
-                }`}>
-                  {lessonBookings.length}
+              {(badge ?? 0) > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab===key?"bg-accent text-white":"bg-accent/20 text-accent"}`}>
+                  {badge}
                 </span>
               )}
             </button>
@@ -90,147 +197,228 @@ export default function MyMatchingsPage() {
         </div>
       )}
 
-      {/* 튜터 계정 역할 레이블 */}
       {isTutor && (
         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-xs font-medium text-primary">
-          <GraduationCap size={13} /> 튜터 계정 — 받은 요청
+          <GraduationCap size={13}/> 튜터 계정 — 받은 요청
         </div>
       )}
 
-      {/* ── 보낸 요청 (학생) ── */}
+      {/* 보낸 요청 탭 (학생) */}
       {!isTutor && activeTab === "requests" && (
-        <div className="space-y-3">
-          {sentMatchings.map((m) => {
+        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+          <div className={`${COL} px-5 py-3 bg-muted/60 border-b border-border`}>
+            <span/><span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">요청 정보</span>
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">상태</span><span className="w-4"/>
+          </div>
+          {sentMatchings.map((m, i) => {
             const isAccepted = m.status === "accepted";
             const tutor = TUTORS.find((t) => t.name === m.tutor);
             return (
-              <div
-                key={m.id}
-                onClick={isAccepted ? () => setBookingMatchingId(m.id) : undefined}
-                className={`bg-card border border-border rounded-xl p-5 transition-all ${
-                  isAccepted ? "cursor-pointer hover:border-primary/40 hover:shadow-md" : ""
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="flex items-start gap-3">
-                    {tutor?.avatar ? (
-                      <img src={tutor.avatar} alt={m.tutor} className="w-10 h-10 rounded-full object-cover bg-muted shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                        <GraduationCap size={18} className="text-primary" />
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{m.tutor}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{m.subject}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{m.date} · {m.time}</p>
-                    </div>
+              <div key={m.id}
+                className={`${COL} px-5 py-4 transition-colors ${i!==sentMatchings.length-1?"border-b border-border":""} ${isAccepted?"cursor-pointer hover:bg-muted/40":"hover:bg-muted/20"}`}
+                onClick={isAccepted ? () => setBookingMatchingId(m.id) : undefined}>
+                {tutor?.avatar
+                  ? <img src={tutor.avatar} alt={m.tutor} className="w-11 h-11 rounded-full object-cover"/>
+                  : <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center"><GraduationCap size={18} className="text-primary"/></div>}
+                <div className="min-w-0 pt-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-bold text-foreground">{m.tutor}</p>
+                    <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{m.subject}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={m.status} />
-                    {isAccepted && (
-                      <span className="flex items-center gap-0.5 text-xs font-medium text-primary">
-                        예약하기 <ChevronRight size={13} />
-                      </span>
-                    )}
-                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{m.date} · {m.time}</p>
+                  <div className="mt-1.5 max-w-xs" onClick={(e)=>e.stopPropagation()}><ExpandableMessage text={m.message}/></div>
                 </div>
-                <p className="mt-3 text-sm text-foreground bg-muted rounded-lg px-3 py-2 leading-relaxed">
-                  "{m.message}"
-                </p>
+                <div className="flex items-center h-11"><StatusBadge status={m.status}/></div>
+                <div className="flex items-center h-11">{isAccepted?<ChevronRight size={15} className="text-primary"/>:<span className="w-4"/>}</div>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* ── 레슨 예약 내역 (학생) ── */}
+      {/* 레슨 예약 탭 (학생) */}
       {!isTutor && activeTab === "bookings" && (
-        <div className="space-y-3">
-          {lessonBookings.length === 0 ? (
-            <div className="bg-card border border-border rounded-xl p-10 text-center text-sm text-muted-foreground">
-              아직 예약한 레슨이 없습니다.
+        <div className="space-y-4">
+          <MiniCalendar events={bookingEvents} selectedDate={bookingSelDate} onSelectDate={setBookingSelDate}/>
+
+          <div className="flex items-center gap-4 px-1">
+            <Legend cls="bg-primary/15 text-primary" label="예약 확정"/>
+            <Legend cls="bg-amber-100 text-amber-700" label="대기 중"/>
+          </div>
+
+          {bookingSelDate && (
+            <DateDetail date={bookingSelDate} items={bookingDateItems} emptyMsg="이 날은 예약된 레슨이 없습니다."/>
+          )}
+
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+            <div className="px-5 py-3 border-b border-border bg-muted/60">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">전체 예약 목록</p>
             </div>
-          ) : (
-            lessonBookings.map((b) => (
-              <div key={b.id} className="bg-card border border-border rounded-xl p-5">
-                {/* 헤더 */}
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="flex items-start gap-3">
-                    <img src={b.avatar} alt={b.tutor} className="w-10 h-10 rounded-full object-cover bg-muted shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{b.tutor} 튜터</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{b.subject}</p>
+            {lessonBookings.length === 0
+              ? <p className="text-center text-sm text-muted-foreground py-10">아직 예약한 레슨이 없습니다.</p>
+              : lessonBookings.map((b, i) => (
+                <div key={b.id} className={`grid grid-cols-[44px_1fr_110px_70px_90px] items-center gap-x-4 px-5 py-4 hover:bg-muted/20 transition-colors ${i!==lessonBookings.length-1?"border-b border-border":""}`}>
+                  <img src={b.avatar} alt={b.tutor} className="w-11 h-11 rounded-full object-cover"/>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-foreground">{b.tutor}</p>
+                      <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{b.subject}</span>
                     </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{fmtDate(b.lessonDate, b.lessonDay)}</p>
                   </div>
-                  <BookingStatusBadge status={b.status} />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{b.startTime} – {b.endTime}</p>
+                    <p className="text-[11px] text-muted-foreground">1시간</p>
+                  </div>
+                  <p className="text-sm font-semibold text-primary">{b.price.toLocaleString()}원</p>
+                  <BookingStatusBadge status={b.status}/>
                 </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
 
-                {/* 레슨 상세 */}
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <div className="bg-muted/50 rounded-lg px-3 py-2.5">
-                    <p className="text-[10px] text-muted-foreground font-medium mb-0.5 flex items-center gap-1">
-                      <Calendar size={10} /> 레슨 날짜
-                    </p>
-                    <p className="text-sm font-semibold text-foreground">{formatDate(b.lessonDate, b.lessonDay)}</p>
-                  </div>
-                  <div className="bg-muted/50 rounded-lg px-3 py-2.5">
-                    <p className="text-[10px] text-muted-foreground font-medium mb-0.5 flex items-center gap-1">
-                      <Clock size={10} /> 레슨 시간
-                    </p>
-                    <p className="text-sm font-semibold text-foreground">{b.startTime} ~ {b.endTime}</p>
-                    <p className="text-[10px] text-muted-foreground">1시간</p>
-                  </div>
-                  <div className="bg-muted/50 rounded-lg px-3 py-2.5">
-                    <p className="text-[10px] text-muted-foreground font-medium mb-0.5">레슨비</p>
-                    <p className="text-sm font-semibold text-primary">{b.price.toLocaleString()}원</p>
+      {/* 결제 탭 (학생) */}
+      {!isTutor && activeTab === "payments" && (
+        <div className="space-y-4">
+          <MiniCalendar events={paymentEvents} selectedDate={paymentSelDate} onSelectDate={setPaymentSelDate}/>
+
+          <div className="flex items-center gap-4 px-1">
+            <Legend cls="bg-emerald-100 text-emerald-700" label="결제 완료"/>
+            <Legend cls="bg-amber-100 text-amber-700" label="미결제"/>
+          </div>
+
+          {paymentSelDate && (
+            <DateDetail date={paymentSelDate} items={paymentDateItems} emptyMsg="이 날은 수업 내역이 없습니다."/>
+          )}
+
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+            <div className="px-5 py-3 border-b border-border bg-muted/60">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">전체 결제 내역</p>
+            </div>
+            <div className="grid grid-cols-[44px_1fr_auto_auto_120px] items-center gap-x-4 px-5 py-2.5 border-b border-border bg-muted/30">
+              <span/>
+              <span className="text-[11px] font-semibold text-muted-foreground">수업 정보</span>
+              <span className="text-[11px] font-semibold text-muted-foreground">일시</span>
+              <span className="text-[11px] font-semibold text-muted-foreground">금액</span>
+              <span className="text-[11px] font-semibold text-muted-foreground">결제 상태</span>
+            </div>
+            {payments.map((p, i) => (
+              <div key={p.id}
+                className={`grid grid-cols-[44px_1fr_auto_auto_120px] items-center gap-x-4 px-5 py-4 transition-colors ${i!==payments.length-1?"border-b border-border":""} ${p.status==="unpaid"?"hover:bg-muted/20":""}`}>
+                <img src={p.avatar} alt={p.tutor} className="w-11 h-11 rounded-full object-cover"/>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-bold text-foreground">{p.tutor}</p>
+                    <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{p.subject}</span>
                   </div>
                 </div>
-
-                {/* 신청 일시 */}
-                <p className="mt-2.5 text-xs text-muted-foreground">예약 신청: {b.requestedAt}</p>
-
+                <div className="text-right">
+                  <p className="text-xs font-medium text-foreground flex items-center gap-1 justify-end">
+                    <Calendar size={11} className="text-muted-foreground"/> {fmtDate(p.lessonDate, p.lessonDay)}
+                  </p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end mt-0.5">
+                    <Clock size={11}/> {p.startTime} – {p.endTime}
+                  </p>
+                </div>
+                <p className="text-sm font-bold text-foreground whitespace-nowrap">{p.price.toLocaleString()}원</p>
+                <div className="flex justify-start">
+                  {p.status === "paid" ? (
+                    <div>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                        <CheckCircle2 size={11}/> 결제 완료
+                      </span>
+                      {p.paidAt && <p className="text-[10px] text-muted-foreground mt-1">{p.paidAt}</p>}
+                    </div>
+                  ) : (
+                    <button onClick={() => setPayingItem(p)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer whitespace-nowrap">
+                      <CreditCard size={13}/> 결제하기
+                    </button>
+                  )}
+                </div>
               </div>
-            ))
+            ))}
+          </div>
+
+          {unpaidCount > 0 && (
+            <div className="flex items-center justify-between gap-3 bg-accent/10 border border-accent/20 rounded-2xl px-5 py-4">
+              <div>
+                <p className="text-sm font-bold text-accent">미결제 수업 {unpaidCount}건</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  미결제 금액: <span className="font-semibold text-foreground">{payments.filter(p=>p.status==="unpaid").reduce((s,p)=>s+p.price,0).toLocaleString()}원</span>
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const first = payments.find(p => p.status === "unpaid");
+                  if (first) setPayingItem(first);
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent/90 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <CreditCard size={15}/> 전체 결제
+              </button>
+            </div>
           )}
         </div>
       )}
 
-      {/* ── 받은 요청 (튜터) ── */}
+      {/* 받은 요청 (튜터) */}
       {isTutor && (
-        <div className="space-y-3">
-          {tutorMatchings.map((m) => (
-            <div key={m.id} className="bg-card border border-border rounded-xl p-5">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                    <User size={18} className="text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{m.student}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{m.subject}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{m.date} · {m.time}</p>
-                  </div>
-                </div>
-                <StatusBadge status={m.status} />
+        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+          <div className={`${COL} px-5 py-3 bg-muted/60 border-b border-border`}>
+            <span/><span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">요청 정보</span>
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">상태</span>
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">액션</span>
+          </div>
+          {tutorMatchings.map((m, i) => (
+            <div key={m.id} className={`${COL} px-5 py-4 hover:bg-muted/20 transition-colors ${i!==tutorMatchings.length-1?"border-b border-border":""}`}>
+              <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center">
+                <User size={18} className="text-primary"/>
               </div>
-              <p className="mt-3 text-sm text-foreground bg-muted rounded-lg px-3 py-2 leading-relaxed">
-                "{m.message}"
-              </p>
-              {m.status === "pending" && (
-                <div className="flex gap-2 mt-3">
-                  <button className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-1 cursor-pointer">
-                    <CheckCircle2 size={13} /> 승인
-                  </button>
-                  <button className="flex-1 py-2 border border-red-200 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-1 cursor-pointer">
-                    <XCircle size={13} /> 거절
-                  </button>
+              <div className="min-w-0 pt-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-bold text-foreground">{m.student}</p>
+                  <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{m.subject}</span>
                 </div>
-              )}
+                <p className="text-xs text-muted-foreground mt-0.5">{m.date} · {m.time}</p>
+                <div className="mt-1.5 max-w-xs"><ExpandableMessage text={m.message}/></div>
+              </div>
+              <div className="flex items-center h-11"><StatusBadge status={m.status}/></div>
+              <div className="flex items-center h-11">
+                {m.status === "pending" ? (
+                  <div className="flex gap-1.5">
+                    <button className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors cursor-pointer flex items-center gap-1">
+                      <CheckCircle2 size={12}/> 승인
+                    </button>
+                    <button className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors cursor-pointer flex items-center gap-1">
+                      <XCircle size={12}/> 거절
+                    </button>
+                  </div>
+                ) : <span/>}
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      {payingItem && (
+        <PaymentModal
+          item={payingItem}
+          onClose={() => setPayingItem(null)}
+          onPaid={(id) => { handlePaid(id); setTimeout(() => setPayingItem(null), 1800); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function Legend({ cls, label }: { cls: string; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`w-3 h-3 rounded-sm ${cls}`}/>
+      <span className="text-xs text-muted-foreground">{label}</span>
     </div>
   );
 }

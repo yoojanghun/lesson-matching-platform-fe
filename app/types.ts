@@ -1,5 +1,27 @@
-export type Page = "home" | "tutors" | "tutor-detail" | "login" | "signup" | "my-matchings" | "matching-request";
-export type Role = "student" | "tutor" | null;
+export type Page =
+  | "home"
+  | "tutors"
+  | "tutor-detail"
+  | "login"
+  | "signup"
+  | "my-matchings"
+  | "matching-request"
+  | "booking"
+  | "schedule";
+
+export type Role = "STUDENT" | "TUTOR" | "GUEST";
+
+export interface LessonOption {
+  label: string;
+  duration: string;
+  price: number;
+}
+
+export interface Career {
+  period: string;
+  title: string;
+  org: string;
+}
 
 export interface Tutor {
   id: number;
@@ -14,8 +36,8 @@ export interface Tutor {
   available: boolean;
   fullIntro?: string;
   education?: string[];
-  careers?: { period: string; title: string; org: string }[];
-  lessonOptions?: { label: string; duration: string; price: number }[];
+  careers?: Career[];
+  lessonOptions?: LessonOption[];
   lessonStyle?: string[];
   totalLessons?: number;
   responseRate?: number;
@@ -52,16 +74,30 @@ export interface TutorMatching {
   message: string;
 }
 
+export interface PaymentItem {
+  id: number;
+  tutor: string;
+  subject: string;
+  avatar: string;
+  lessonDate: string;   // "2026-07-28"
+  lessonDay: string;
+  startTime: string;
+  endTime: string;
+  price: number;
+  status: "unpaid" | "paid";
+  paidAt?: string;
+}
+
 export interface LessonBooking {
   id: number;
   tutor: string;
   subject: string;
   avatar: string;
-  lessonDate: string;
-  lessonDay: string;
-  startTime: string;
-  endTime: string;
+  lessonDate: string;      // "2026-07-28"
+  lessonDay: string;       // "월"
+  startTime: string;       // "10:30"
+  endTime: string;         // "11:30"
   price: number;
   status: "pending" | "confirmed" | "rejected";
-  requestedAt: string;
+  requestedAt: string;     // 예약 신청 일시
 }

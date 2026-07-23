@@ -9,16 +9,23 @@ import SignUpPage from "../pages/SignUpPage";
 import MyMatchingsPage from "../pages/MyMatchingsPage";
 import MatchingRequestPage from "../pages/MatchingRequestPage";
 import BookingPage from "../pages/BookingPage";
+import SchedulePage from "../pages/SchedulePage";
 
-const NAV_ITEMS: { label: string; page: Page }[] = [
+const NAV_ITEMS_COMMON: { label: string; page: Page }[] = [
   { label: "홈", page: "home" },
   { label: "튜터 찾기", page: "tutors" },
   { label: "내 매칭", page: "my-matchings" },
+];
+const NAV_ITEMS_TUTOR: { label: string; page: Page }[] = [
+  { label: "홈", page: "home" },
+  { label: "내 매칭", page: "my-matchings" },
+  { label: "스케줄 관리", page: "schedule" },
 ];
 
 export default function App() {
   const [page, setPage] = useState<Page>("home");
   const [role, setRole] = useState<Role>(null);
+  const [userName, setUserName] = useState("");
   const [selectedTutorId, setSelectedTutorId] = useState<number>(1);
   const [selectedMatchingId, setSelectedMatchingId] = useState<number>(1);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -29,8 +36,22 @@ export default function App() {
     setTimeout(() => setToast(""), 3000);
   };
 
+  const handleLogin = (r: Role, name: string) => {
+    setRole(r);
+    setUserName(name);
+    showToast(`${name}님, 환영합니다!`);
+    setPage("home");
+  };
+
+  const handleLogout = () => {
+    setRole(null);
+    setUserName("");
+    setPage("home");
+  };
+
   const handleSignUp = (r: Role) => {
     setRole(r);
+    setUserName(r === "student" ? "신규 학생" : "신규 튜터");
     showToast(`${r === "student" ? "학생" : "튜터"} 계정으로 가입되었습니다!`);
     setPage("home");
   };
@@ -56,7 +77,7 @@ export default function App() {
 
           {/* Desktop nav */}
           <nav className="hidden sm:flex items-center gap-1">
-            {NAV_ITEMS.map(({ label, page: p }) => (
+            {(role === "tutor" ? NAV_ITEMS_TUTOR : NAV_ITEMS_COMMON).map(({ label, page: p }) => (
               <button
                 key={p}
                 onClick={() => setPage(p)}
@@ -72,11 +93,12 @@ export default function App() {
           <div className="hidden sm:flex items-center gap-2">
             {role ? (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground border border-border px-2 py-1 rounded-full">
-                  {role === "student" ? "학생" : "튜터"}
-                </span>
+                <div className="flex items-center gap-1.5 bg-secondary px-2.5 py-1 rounded-full">
+                  <span className="text-[10px] font-semibold text-primary/60">{role === "student" ? "학생" : "튜터"}</span>
+                  <span className="text-xs font-semibold text-primary">{userName}</span>
+                </div>
                 <button
-                  onClick={() => setRole(null)}
+                  onClick={handleLogout}
                   className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   로그아웃
@@ -112,7 +134,7 @@ export default function App() {
         {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="sm:hidden border-t border-border bg-card px-4 py-3 space-y-1">
-            {NAV_ITEMS.map(({ label, page: p }) => (
+            {(role === "tutor" ? NAV_ITEMS_TUTOR : NAV_ITEMS_COMMON).map(({ label, page: p }) => (
               <button
                 key={p}
                 onClick={() => { setPage(p); setMobileMenuOpen(false); }}
@@ -122,18 +144,29 @@ export default function App() {
               </button>
             ))}
             <div className="pt-2 flex gap-2">
-              <button
-                onClick={() => { setPage("login"); setMobileMenuOpen(false); }}
-                className="flex-1 py-2 border border-border rounded-lg text-sm text-foreground cursor-pointer"
-              >
-                로그인
-              </button>
-              <button
-                onClick={() => { setPage("signup"); setMobileMenuOpen(false); }}
-                className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold cursor-pointer"
-              >
-                회원가입
-              </button>
+              {role ? (
+                <button
+                  onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                  className="flex-1 py-2 border border-border rounded-lg text-sm text-foreground cursor-pointer"
+                >
+                  로그아웃 ({userName})
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => { setPage("login"); setMobileMenuOpen(false); }}
+                    className="flex-1 py-2 border border-border rounded-lg text-sm text-foreground cursor-pointer"
+                  >
+                    로그인
+                  </button>
+                  <button
+                    onClick={() => { setPage("signup"); setMobileMenuOpen(false); }}
+                    className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold cursor-pointer"
+                  >
+                    회원가입
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -156,7 +189,7 @@ export default function App() {
           />
         )}
         {page === "login" && (
-          <LoginPage onNavigateSignUp={() => setPage("signup")} />
+          <LoginPage onNavigateSignUp={() => setPage("signup")} onLogin={handleLogin} />
         )}
         {page === "signup" && (
           <SignUpPage onSignUp={handleSignUp} />
@@ -181,6 +214,7 @@ export default function App() {
             onSubmit={handleMatchingSubmit}
           />
         )}
+        {page === "schedule" && <SchedulePage />}
       </main>
 
       {/* Toast */}

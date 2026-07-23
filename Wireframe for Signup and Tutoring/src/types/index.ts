@@ -6,7 +6,8 @@ export type Page =
   | "login"
   | "my-matchings"
   | "matching-request"
-  | "booking";
+  | "booking"
+  | "schedule";
 
 export type Role = "student" | "tutor" | null;
 
@@ -72,6 +73,20 @@ export interface TutorMatching {
   time: string;
   status: string;
   message: string;
+}
+
+export interface PaymentItem {
+  id: number;
+  tutor: string;
+  subject: string;
+  avatar: string;
+  lessonDate: string;   // "2026-07-28"
+  lessonDay: string;
+  startTime: string;
+  endTime: string;
+  price: number;
+  status: "unpaid" | "paid";
+  paidAt?: string;
 }
 
 export interface LessonBooking {

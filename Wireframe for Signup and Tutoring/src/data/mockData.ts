@@ -1,5 +1,5 @@
 import { Music, Guitar, Mic2, Piano, Drum, Waves, PenLine } from "lucide-react";
-import type { Tutor, Review, StudentMatching, TutorMatching, LessonBooking } from "../types";
+import type { Tutor, Review, StudentMatching, TutorMatching, LessonBooking, PaymentItem } from "../types";
 
 export const CATEGORIES = [
   { icon: Piano, label: "피아노", count: 134 },
@@ -198,5 +198,45 @@ export const MY_LESSON_BOOKINGS: LessonBooking[] = [
     price: 35000,
     status: "rejected",
     requestedAt: "2026-07-08 09:10",
+  },
+];
+
+export const MY_PAYMENTS: PaymentItem[] = [
+  {
+    id: 1,
+    tutor: "박민준",
+    subject: "기타 · 우쿨렐레",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&auto=format",
+    lessonDate: "2026-07-14",
+    lessonDay: "월",
+    startTime: "10:30",
+    endTime: "11:30",
+    price: 35000,
+    status: "paid",
+    paidAt: "2026-07-14 12:05",
+  },
+  {
+    id: 2,
+    tutor: "박민준",
+    subject: "기타 · 우쿨렐레",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&auto=format",
+    lessonDate: "2026-07-21",
+    lessonDay: "월",
+    startTime: "10:30",
+    endTime: "11:30",
+    price: 35000,
+    status: "unpaid",
+  },
+  {
+    id: 3,
+    tutor: "박민준",
+    subject: "기타 · 우쿨렐레",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&auto=format",
+    lessonDate: "2026-07-28",
+    lessonDay: "월",
+    startTime: "10:30",
+    endTime: "11:30",
+    price: 35000,
+    status: "unpaid",
   },
 ];
