@@ -3,6 +3,7 @@ import "./styles/fonts.css";
 import "./styles/tailwind.css";
 
 import { UserProvider } from "./components/UserContext";
+import QueryProvider from "./providers/QueryProvider";
 import Navbar from "./components/Navbar";
 import GlobalToast from "./components/Toast";
 import GlobalChatButton from "./components/GlobalChatButton";
@@ -21,23 +22,23 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="bg-background font-[Inter,'Noto_Sans_KR',sans-serif]">
-        <UserProvider>
-          <div className="min-h-screen flex flex-col">
-            <Navbar />
-            <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
-              {children}
-            </main>
-            <footer className="max-w-5xl w-full mx-auto px-4 py-8 border-t border-border mt-8 text-center">
-              <p className="text-xs text-muted-foreground">TutorMatch · Wireframe · Next.js App Router</p>
-            </footer>
-            <GlobalToast />
-            <GlobalChatButton />
-            <AIAssistant />
-          </div>
-        </UserProvider>
+        <QueryProvider>
+          <UserProvider>
+            <div className="min-h-screen flex flex-col">
+              <Navbar />
+              <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
+                {children}
+              </main>
+              <footer className="max-w-5xl w-full mx-auto px-4 py-8 border-t border-border mt-8 text-center">
+                <p className="text-xs text-muted-foreground">TutorMatch · Wireframe · Next.js App Router</p>
+              </footer>
+              <GlobalToast />
+              <GlobalChatButton />
+              <AIAssistant />
+            </div>
+          </UserProvider>
+        </QueryProvider>
       </body>
     </html>
   );
 }
-
-
