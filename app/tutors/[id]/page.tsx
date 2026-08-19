@@ -1,15 +1,28 @@
-"use client";
-import { useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+'use client';
+
+import { useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import {
-  ArrowLeft, Send, MessageSquare, User, Star,
-  MapPin, Video, Clock, CheckCircle2, GraduationCap,
-  Briefcase, BookOpen, ChevronDown, ChevronUp, Award,
-} from "lucide-react";
-import Image from "next/image";
-import { TUTORS, REVIEWS } from "../../data/mockData";
-import StarRow from "../../components/StarRow";
-import { useUser } from "../../components/UserContext";
+  ArrowLeft,
+  Send,
+  MessageSquare,
+  User,
+  Star,
+  MapPin,
+  Video,
+  Clock,
+  CheckCircle2,
+  GraduationCap,
+  Briefcase,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Award,
+} from 'lucide-react';
+import { TUTORS, REVIEWS as INITIAL_REVIEWS } from '../../data/mockData';
+import StarRow from '../../components/StarRow';
+import { useUser } from '../../components/UserContext';
+import { FloatingChat } from '../../components/ChatPanel';
 
 const RATING_DIST = [
   { star: 5, count: 71 },
@@ -24,16 +37,28 @@ export default function TutorDetailPage() {
   const router = useRouter();
   const params = useParams();
   const tutorId = Number(params.id);
-  const { role } = useUser();
+  const { role, reviews, addReview } = useUser();
   const tutor = TUTORS.find((t) => t.id === tutorId) ?? TUTORS[0];
+
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
-  const [reviewText, setReviewText] = useState("");
+  const [reviewText, setReviewText] = useState('');
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const visibleReviews = showAllReviews ? REVIEWS : REVIEWS.slice(0, 3);
+
+  const allReviews = reviews.length > 0 ? reviews : INITIAL_REVIEWS;
+  const visibleReviews = showAllReviews ? allReviews : allReviews.slice(0, 3);
 
   const toggle = (key: string) => setActiveSection(activeSection === key ? null : key);
+
+  const handleSubmitReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (reviewRating === 0 || reviewText.trim().length < 5) return;
+    addReview(tutor.id, reviewRating, reviewText.trim());
+    setReviewText('');
+    setReviewRating(0);
+    setHoverRating(0);
+  };
 
   return (
     <div className="space-y-6">
@@ -46,12 +71,12 @@ export default function TutorDetailPage() {
       </button>
 
       {/* 상단 프로필 카드 */}
-      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
         {/* Cover band */}
-        <div className="h-24 relative" style={{ background: "linear-gradient(to right, #1e3a5f, rgba(30,58,95,0.7))" }}>
+        <div className="h-24 relative bg-primary">
           <div
             className="absolute inset-0 opacity-20"
-            style={{ backgroundImage: "radial-gradient(circle at 80% 50%, #e05a2b 0%, transparent 60%)" }}
+            style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, #e05a2b 0%, transparent 60%)' }}
           />
         </div>
 
@@ -59,11 +84,9 @@ export default function TutorDetailPage() {
           {/* Avatar + quick actions */}
           <div className="flex items-end justify-between -mt-10 mb-4">
             <div className="relative">
-              <Image
+              <img
                 src={tutor.avatar}
                 alt={tutor.name}
-                width={80}
-                height={80}
                 className="w-20 h-20 rounded-2xl object-cover border-4 border-card bg-muted shadow-md"
               />
               {tutor.available && (
@@ -71,8 +94,12 @@ export default function TutorDetailPage() {
               )}
             </div>
             <div className="flex gap-2 mb-1">
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${tutor.available ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                {tutor.available ? "● 수업 가능" : "● 마감"}
+              <span
+                className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                  tutor.available ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                }`}
+              >
+                {tutor.available ? '● 수업 가능' : '● 마감'}
               </span>
               {tutor.onlineAvailable && (
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-blue-50 text-blue-600 flex items-center gap-1">
@@ -93,16 +120,23 @@ export default function TutorDetailPage() {
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs text-muted-foreground">
             {tutor.location && (
-              <span className="flex items-center gap-1"><MapPin size={12} /> {tutor.location}</span>
+              <span className="flex items-center gap-1">
+                <MapPin size={12} /> {tutor.location}
+              </span>
             )}
             {tutor.responseTime && (
-              <span className="flex items-center gap-1"><Clock size={12} /> 응답 {tutor.responseTime}</span>
+              <span className="flex items-center gap-1">
+                <Clock size={12} /> 응답 {tutor.responseTime}
+              </span>
             )}
           </div>
 
           <div className="flex flex-wrap gap-1.5 mt-4">
             {tutor.tags.map((tag) => (
-              <span key={tag} className="px-2.5 py-1 bg-secondary text-secondary-foreground rounded-lg text-xs font-medium">
+              <span
+                key={tag}
+                className="px-2.5 py-1 bg-secondary text-secondary-foreground rounded-lg text-xs font-medium"
+              >
                 {tag}
               </span>
             ))}
@@ -113,11 +147,11 @@ export default function TutorDetailPage() {
       {/* 통계 바 */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { icon: BookOpen, label: "총 레슨 수", value: `${tutor.totalLessons ?? "240+"}회` },
-          { icon: CheckCircle2, label: "응답률", value: `${tutor.responseRate ?? 98}%` },
-          { icon: Award, label: "수상 이력", value: "KMO 은상" },
+          { icon: BookOpen, label: '총 레슨 수', value: `${tutor.totalLessons ?? '240+'}회` },
+          { icon: CheckCircle2, label: '응답률', value: `${tutor.responseRate ?? 98}%` },
+          { icon: Award, label: '수상 이력', value: '콩쿠르 대상' },
         ].map(({ icon: Icon, label, value }) => (
-          <div key={label} className="bg-card border border-border rounded-xl p-4 text-center">
+          <div key={label} className="bg-card border border-border rounded-xl p-4 text-center shadow-sm">
             <div className="flex justify-center mb-1.5">
               <Icon size={18} className="text-accent" />
             </div>
@@ -129,7 +163,7 @@ export default function TutorDetailPage() {
 
       {/* 레슨비 옵션 */}
       {tutor.lessonOptions && (
-        <div className="bg-card border border-border rounded-2xl p-5">
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
           <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
             <span className="w-1 h-4 bg-accent rounded-full inline-block" />
             레슨비 안내
@@ -138,10 +172,14 @@ export default function TutorDetailPage() {
             {tutor.lessonOptions.map((opt) => (
               <div
                 key={opt.label}
-                className={`rounded-xl border p-4 text-center ${opt.label === "기본 수업" ? "border-primary/40 bg-secondary" : "border-border"}`}
+                className={`rounded-xl border p-4 text-center ${
+                  opt.label === '기본 수업' ? 'border-primary/40 bg-secondary' : 'border-border'
+                }`}
               >
-                {opt.label === "기본 수업" && (
-                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full mb-2 inline-block">추천</span>
+                {opt.label === '기본 수업' && (
+                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full mb-2 inline-block">
+                    추천
+                  </span>
                 )}
                 <p className="text-xs text-muted-foreground">{opt.label}</p>
                 <p className="text-lg font-bold text-foreground mt-1">{opt.price.toLocaleString()}원</p>
@@ -149,25 +187,41 @@ export default function TutorDetailPage() {
               </div>
             ))}
           </div>
-          {role === "STUDENT" && tutor.available && (
-            <button
-              onClick={() => router.push(`/matching-request/${tutor.id}`)}
-              className="mt-5 w-full py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              style={{ backgroundColor: "#e05a2b", color: "#ffffff" }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#c44e22")}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#e05a2b")}
-            >
-              <Send size={15} /> 레슨 매칭 요청하기
-            </button>
+
+          {tutor.available && (
+            <div className="mt-5 flex gap-3 flex-col sm:flex-row">
+              <button
+                type="button"
+                onClick={() => router.push(`/chat?tutorId=${tutor.id}`)}
+                className="flex-1 py-3 bg-secondary border border-primary/20 text-primary rounded-xl text-sm font-semibold hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <MessageSquare size={15} /> 1:1 채팅 문의
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (role === 'GUEST') {
+                    router.push('/login');
+                  } else {
+                    router.push(`/matching-request/${tutor.id}`);
+                  }
+                }}
+                className="flex-1 py-3 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Send size={15} /> 레슨 매칭 요청하기
+              </button>
+            </div>
           )}
-          {role === "GUEST" && (
-            <p className="mt-4 text-center text-xs text-muted-foreground">매칭 요청을 보내려면 로그인이 필요합니다.</p>
+          {role === 'GUEST' && (
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              매칭 요청 및 채팅 문의를 하려면 로그인이 필요합니다.
+            </p>
           )}
         </div>
       )}
 
       {/* 튜터 소개 */}
-      <div className="bg-card border border-border rounded-2xl p-5">
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
         <h2 className="text-base font-bold text-foreground mb-3 flex items-center gap-2">
           <span className="w-1 h-4 bg-accent rounded-full inline-block" />
           튜터 소개
@@ -175,9 +229,9 @@ export default function TutorDetailPage() {
         <p className="text-sm text-foreground leading-relaxed">{tutor.fullIntro ?? tutor.intro}</p>
       </div>
 
-      {/* 수업 스타일 */}
+      {/* 수업 방식 */}
       {tutor.lessonStyle && (
-        <div className="bg-card border border-border rounded-2xl p-5">
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
           <h2 className="text-base font-bold text-foreground mb-3 flex items-center gap-2">
             <span className="w-1 h-4 bg-accent rounded-full inline-block" />
             수업 방식
@@ -195,18 +249,22 @@ export default function TutorDetailPage() {
 
       {/* 학력 */}
       {tutor.education && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
           <button
-            onClick={() => toggle("edu")}
+            onClick={() => toggle('edu')}
             className="w-full flex items-center justify-between px-5 py-4 text-left cursor-pointer hover:bg-muted/30 transition-colors"
           >
             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
               <GraduationCap size={16} className="text-primary" />
               학력
             </h2>
-            {activeSection === "edu" ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+            {activeSection === 'edu' ? (
+              <ChevronUp size={16} className="text-muted-foreground" />
+            ) : (
+              <ChevronDown size={16} className="text-muted-foreground" />
+            )}
           </button>
-          {activeSection === "edu" && (
+          {activeSection === 'edu' && (
             <div className="px-5 pb-5 space-y-2.5 border-t border-border pt-4">
               {tutor.education.map((edu, i) => (
                 <div key={i} className="flex items-start gap-2.5">
@@ -221,18 +279,22 @@ export default function TutorDetailPage() {
 
       {/* 경력 */}
       {tutor.careers && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
           <button
-            onClick={() => toggle("career")}
+            onClick={() => toggle('career')}
             className="w-full flex items-center justify-between px-5 py-4 text-left cursor-pointer hover:bg-muted/30 transition-colors"
           >
             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
               <Briefcase size={16} className="text-primary" />
               경력
             </h2>
-            {activeSection === "career" ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+            {activeSection === 'career' ? (
+              <ChevronUp size={16} className="text-muted-foreground" />
+            ) : (
+              <ChevronDown size={16} className="text-muted-foreground" />
+            )}
           </button>
-          {activeSection === "career" && (
+          {activeSection === 'career' && (
             <div className="px-5 pb-5 border-t border-border pt-4">
               <div className="relative pl-4 space-y-5">
                 <div className="absolute left-0 top-1 bottom-1 w-px bg-border" />
@@ -251,11 +313,13 @@ export default function TutorDetailPage() {
       )}
 
       {/* 리뷰 섹션 */}
-      <div className="bg-card border border-border rounded-2xl p-5">
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
         <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
           <span className="w-1 h-4 bg-accent rounded-full inline-block" />
           수강생 리뷰
-          <span className="text-sm font-normal text-muted-foreground ml-1">({REVIEWS.length}개)</span>
+          <span className="text-sm font-normal text-muted-foreground ml-1">
+            ({allReviews.length}개)
+          </span>
         </h2>
 
         {/* Rating summary */}
@@ -263,7 +327,7 @@ export default function TutorDetailPage() {
           <div className="text-center shrink-0">
             <p className="text-4xl font-bold text-foreground">{tutor.rating}</p>
             <StarRow rating={tutor.rating} size={14} />
-            <p className="text-xs text-muted-foreground mt-1">{TOTAL_RATINGS}개 리뷰</p>
+            <p className="text-xs text-muted-foreground mt-1">{TOTAL_RATINGS}개 평가</p>
           </div>
           <div className="flex-1 space-y-1.5">
             {RATING_DIST.map(({ star, count }) => (
@@ -285,7 +349,7 @@ export default function TutorDetailPage() {
         {/* Review cards */}
         <div className="space-y-3">
           {visibleReviews.map((r) => (
-            <div key={r.id} className="border border-border rounded-xl p-4">
+            <div key={r.id} className="border border-border rounded-xl p-4 bg-card">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center">
@@ -303,19 +367,19 @@ export default function TutorDetailPage() {
           ))}
         </div>
 
-        {!showAllReviews && REVIEWS.length > 3 && (
+        {!showAllReviews && allReviews.length > 3 && (
           <button
             onClick={() => setShowAllReviews(true)}
             className="mt-3 w-full py-2.5 border border-border rounded-xl text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer"
           >
-            리뷰 더 보기 ({REVIEWS.length - 3}개)
+            리뷰 더 보기 ({allReviews.length - 3}개)
           </button>
         )}
       </div>
 
-      {/* 리뷰 작성 (학생만) */}
-      {role === "STUDENT" && (
-        <div className="bg-card border border-border rounded-2xl p-5">
+      {/* 리뷰 작성 (학생 계정 로그인 시) */}
+      {role === 'STUDENT' && (
+        <form onSubmit={handleSubmitReview} className="bg-card border border-border rounded-2xl p-5 shadow-sm">
           <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
             <MessageSquare size={15} className="text-primary" />
             리뷰 작성
@@ -323,7 +387,7 @@ export default function TutorDetailPage() {
 
           <div className="mb-3">
             <p className="text-xs text-muted-foreground mb-1.5">별점을 선택해 주세요</p>
-            <div className="flex gap-1">
+            <div className="flex gap-1 items-center">
               {[1, 2, 3, 4, 5].map((n) => (
                 <Star
                   key={n}
@@ -333,14 +397,14 @@ export default function TutorDetailPage() {
                   onClick={() => setReviewRating(n)}
                   className={`cursor-pointer transition-colors ${
                     n <= (hoverRating || reviewRating)
-                      ? "fill-amber-400 text-amber-400"
-                      : "fill-gray-200 text-gray-200"
+                      ? 'fill-amber-400 text-amber-400'
+                      : 'fill-gray-200 text-gray-200'
                   }`}
                 />
               ))}
               {reviewRating > 0 && (
-                <span className="ml-2 text-sm text-muted-foreground self-center">
-                  {["", "별로예요", "그저 그래요", "괜찮아요", "좋아요", "최고예요!"][reviewRating]}
+                <span className="ml-2 text-sm text-muted-foreground">
+                  {['', '별로예요', '그저 그래요', '괜찮아요', '좋아요', '최고예요!'][reviewRating]}
                 </span>
               )}
             </div>
@@ -356,14 +420,23 @@ export default function TutorDetailPage() {
           <div className="flex items-center justify-between mt-1.5">
             <p className="text-xs text-muted-foreground">{reviewText.length}/300</p>
             <button
-              disabled={reviewRating === 0 || reviewText.trim().length < 10}
+              type="submit"
+              disabled={reviewRating === 0 || reviewText.trim().length < 5}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               리뷰 등록
             </button>
           </div>
-        </div>
+        </form>
       )}
+
+      {/* 강사 프로필 전용 플로팅 1:1 채팅 위젯 */}
+      <FloatingChat
+        tutorName={tutor.name}
+        tutorAvatar={tutor.avatar}
+        tutorSubject={tutor.subject}
+      />
     </div>
   );
 }
+

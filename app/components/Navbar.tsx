@@ -14,12 +14,11 @@ const NAV_ITEMS_STUDENT = [
 const NAV_ITEMS_TUTOR = [
   { label: "홈", path: "/" },
   { label: "내 매칭", path: "/my-matchings" },
-  { label: "스케줄 관리", path: "/schedule" },
 ];
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { role, logout } = useUser();
+  const { role, userName, logout } = useUser();
   const pathname = usePathname();
 
   const navItems = role === "TUTOR" ? NAV_ITEMS_TUTOR : NAV_ITEMS_STUDENT;
@@ -55,15 +54,17 @@ export default function Navbar() {
         <div className="hidden sm:flex items-center gap-2">
           {role !== "GUEST" ? (
             <div className="flex items-center gap-2">
-              <span
-                className="text-xs px-2.5 py-1 rounded-full font-semibold"
-                style={{ backgroundColor: "#e8f0fb", color: "#1e3a5f" }}
-              >
-                {role === "STUDENT" ? "학생" : "튜터"}
-              </span>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary text-primary">
+                <span className="text-[10px] font-semibold text-primary/70">
+                  {role === "STUDENT" ? "학생" : "튜터"}
+                </span>
+                <span className="text-xs font-bold text-primary">
+                  {userName || (role === "STUDENT" ? "김학생" : "김지수 튜터")}
+                </span>
+              </div>
               <button
                 onClick={logout}
-                className="text-xs cursor-pointer text-muted-foreground hover:text-foreground"
+                className="text-xs cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
               >
                 로그아웃
               </button>
@@ -72,19 +73,13 @@ export default function Navbar() {
             <>
               <Link
                 href="/login"
-                className="px-3 py-1.5 text-sm font-medium transition-colors"
-                style={{ color: "#6b748a" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#1e3a5f")}
-                onMouseLeave={e => (e.currentTarget.style.color = "#6b748a")}
+                className="px-3 py-1.5 text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
               >
                 로그인
               </Link>
               <Link
                 href="/signup"
-                className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors inline-block"
-                style={{ backgroundColor: "#1e3a5f", color: "#ffffff" }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#16304f")}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#1e3a5f")}
+                className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors inline-block bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 회원가입
               </Link>
@@ -103,7 +98,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="sm:hidden border-t border-border px-4 py-3 space-y-1" style={{ backgroundColor: "#ffffff" }}>
+        <div className="sm:hidden border-t border-border px-4 py-3 space-y-1 bg-card">
           {navItems.map(({ label, path }) => (
             <Link
               key={path}
@@ -120,7 +115,7 @@ export default function Navbar() {
                 onClick={() => { logout(); setMobileMenuOpen(false); }}
                 className="flex-1 py-2 border border-border rounded-lg text-sm text-foreground text-center"
               >
-                로그아웃
+                로그아웃 ({userName || (role === "STUDENT" ? "학생" : "튜터")})
               </button>
             ) : (
               <>
@@ -134,8 +129,7 @@ export default function Navbar() {
                 <Link
                   href="/signup"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-center inline-block"
-                  style={{ backgroundColor: "#1e3a5f", color: "#ffffff" }}
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-center inline-block bg-primary text-primary-foreground"
                 >
                   회원가입
                 </Link>

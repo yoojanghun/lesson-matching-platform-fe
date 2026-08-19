@@ -11,6 +11,8 @@ interface Props {
   events: CalEvent[];
   onSelectDate: (date: string | null) => void;
   selectedDate: string | null;
+  onMonthChange?: (year: number, month: number) => void;
+  onClickDate?: (date: string) => void;
 }
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -26,7 +28,7 @@ const COLOR_MAP: Record<CalEvent["color"], string> = {
   red:   "bg-red-100 text-red-600",
 };
 
-export default function MiniCalendar({ events, onSelectDate, selectedDate }: Props) {
+export default function MiniCalendar({ events, onSelectDate, selectedDate, onMonthChange, onClickDate }: Props) {
   const today = new Date();
   const [viewY, setViewY] = useState(today.getFullYear());
   const [viewM, setViewM] = useState(today.getMonth() + 1);
@@ -43,8 +45,14 @@ export default function MiniCalendar({ events, onSelectDate, selectedDate }: Pro
 
   const eventsOnDate = (d: string) => events.filter((e) => e.date === d);
 
-  const prev = () => { if (viewM === 1) { setViewY(viewY-1); setViewM(12); } else setViewM(viewM-1); onSelectDate(null); };
-  const next = () => { if (viewM === 12) { setViewY(viewY+1); setViewM(1); } else setViewM(viewM+1); onSelectDate(null); };
+  const prev = () => {
+    const [ny, nm] = viewM === 1 ? [viewY - 1, 12] : [viewY, viewM - 1];
+    setViewY(ny); setViewM(nm); onSelectDate(null); onMonthChange?.(ny, nm);
+  };
+  const next = () => {
+    const [ny, nm] = viewM === 12 ? [viewY + 1, 1] : [viewY, viewM + 1];
+    setViewY(ny); setViewM(nm); onSelectDate(null); onMonthChange?.(ny, nm);
+  };
 
   return (
     <div className="bg-card rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden">
@@ -76,7 +84,7 @@ export default function MiniCalendar({ events, onSelectDate, selectedDate }: Pro
           return (
             <div
               key={dateStr}
-              onClick={() => onSelectDate(isSelected ? null : dateStr)}
+              onClick={() => { onSelectDate(isSelected ? null : dateStr); onClickDate?.(dateStr); }}
               className={`h-16 p-1 flex flex-col border-border/40 cursor-pointer transition-colors ${idx<35?"border-b":""} ${idx%7!==6?"border-r":""} ${isSelected?"bg-primary/5":"hover:bg-muted/40"}`}
             >
               <span className={`text-[11px] font-bold w-5 h-5 flex items-center justify-center rounded-full self-start mb-0.5 ${

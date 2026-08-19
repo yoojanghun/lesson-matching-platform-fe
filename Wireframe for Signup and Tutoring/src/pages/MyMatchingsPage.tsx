@@ -1,20 +1,28 @@
 import { useState } from "react";
 import {
-  CheckCircle2, XCircle, GraduationCap, User,
+  CheckCircle2, GraduationCap, User,
   ChevronRight, ChevronDown, CreditCard, Calendar, Clock,
 } from "lucide-react";
-import type { Role, PaymentItem } from "../types";
+import type { Role, PaymentItem, TutorLessonRequest, TutorMatching } from "../types";
 import {
-  MY_MATCHINGS_STUDENT, MY_MATCHINGS_TUTOR,
+  MY_MATCHINGS_STUDENT,
   MY_LESSON_BOOKINGS, MY_PAYMENTS, TUTORS,
+  TUTOR_LESSON_REQUESTS,
 } from "../data/mockData";
 import StatusBadge from "../components/StatusBadge";
 import PaymentModal from "../components/PaymentModal";
 import MiniCalendar, { type CalEvent } from "../components/MiniCalendar";
+import SchedulePage from "./SchedulePage";
+import TutorRevenuePanel from "../components/TutorRevenuePanel";
+import ApproveRejectModal from "../components/ApproveRejectModal";
 
 interface Props {
   role: Role;
   onOpenBooking: (matchingId: number) => void;
+  tutorMatchingsList: TutorMatching[];
+  onApproveMatching: (id: number) => void;
+  onRejectMatching: (id: number) => void;
+  onOpenStudentDetail: (matchingId: number) => void;
 }
 
 /* ── 작은 helpers ── */
@@ -46,67 +54,42 @@ function ExpandableMessage({ text }: { text: string }) {
   );
 }
 
-/* 선택된 날짜의 수업 상세 패널 */
-function DateDetail({
-  date,
-  items,
-  emptyMsg,
-}: {
-  date: string;
-  items: { avatar: string; tutor: string; subject: string; startTime: string; endTime: string; badge: React.ReactNode }[];
-  emptyMsg: string;
-}) {
-  const WDAYS = ["일","월","화","수","목","금","토"];
-  const dow = WDAYS[new Date(date).getDay()];
-  const [y, m, d] = date.split("-").map(Number);
-  return (
-    <div className="bg-card rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden">
-      <div className="px-5 py-3 border-b border-border bg-muted/40">
-        <p className="text-sm font-bold text-foreground">{y}년 {m}월 {d}일 ({dow})</p>
-      </div>
-      {items.length === 0 ? (
-        <p className="text-center text-sm text-muted-foreground py-8">{emptyMsg}</p>
-      ) : (
-        items.map((it, i) => (
-          <div key={i} className={`flex items-center gap-4 px-5 py-4 ${i !== items.length-1 ? "border-b border-border" : ""}`}>
-            <img src={it.avatar} alt={it.tutor} className="w-10 h-10 rounded-full object-cover shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-sm font-bold text-foreground">{it.tutor}</p>
-                <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{it.subject}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                <Clock size={11} /> {it.startTime} – {it.endTime} (1시간)
-              </p>
-            </div>
-            <div className="shrink-0">{it.badge}</div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
 
 const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
 
 /* ── 메인 ── */
-export default function MyMatchingsPage({ role, onOpenBooking }: Props) {
+export default function MyMatchingsPage({
+  role, onOpenBooking,
+  tutorMatchingsList, onApproveMatching, onRejectMatching, onOpenStudentDetail,
+}: Props) {
   const isTutor = role === "tutor";
-  const [activeTab, setActiveTab] = useState<"requests" | "bookings" | "payments">("requests");
-  const [payments, setPayments] = useState<PaymentItem[]>(MY_PAYMENTS);
-  const [payingItem, setPayingItem] = useState<PaymentItem | null>(null);
 
-  // 캘린더 선택 날짜 — 초기값을 오늘로 설정해 상세 패널이 바로 보임
   const todayStr = (() => {
     const t = new Date();
     return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
   })();
-  const [bookingSelDate, setBookingSelDate] = useState<string | null>(todayStr);
-  const [paymentSelDate, setPaymentSelDate] = useState<string | null>(todayStr);
 
-  const sentMatchings   = MY_MATCHINGS_STUDENT;
-  const tutorMatchings  = MY_MATCHINGS_TUTOR;
-  const lessonBookings  = MY_LESSON_BOOKINGS;
+  const [activeTab, setActiveTab] = useState<"requests" | "bookings" | "payments">("requests");
+  const [tutorTab, setTutorTab] = useState<"received" | "lessons" | "schedule" | "revenue">("received");
+
+  const [approveModalTarget, setApproveModalTarget] = useState<TutorMatching | null>(null);
+
+  const [lessonRequests, setLessonRequests] = useState<TutorLessonRequest[]>(TUTOR_LESSON_REQUESTS);
+  const [lessonReqSelDate, setLessonReqSelDate] = useState<string | null>(null);
+  const [lessonReqPopup, setLessonReqPopup] = useState<string | null>(null);
+  const [lessonReqModal, setLessonReqModal] = useState<TutorLessonRequest | null>(null);
+
+  const [payments, setPayments] = useState<PaymentItem[]>(MY_PAYMENTS);
+  const [payingItem, setPayingItem] = useState<PaymentItem | null>(null);
+
+  const [bookingSelDate, setBookingSelDate] = useState<string | null>(null);
+  const [bookingPopup, setBookingPopup] = useState<string | null>(null);
+  const [paymentSelDate, setPaymentSelDate] = useState<string | null>(null);
+  const [paymentPopup, setPaymentPopup] = useState<string | null>(null);
+
+  const sentMatchings  = MY_MATCHINGS_STUDENT;
+  const tutorMatchings = tutorMatchingsList;
+  const lessonBookings = MY_LESSON_BOOKINGS;
   const unpaidCount     = payments.filter((p) => p.status === "unpaid").length;
 
   const handlePaid = (id: number) => {
@@ -131,31 +114,6 @@ export default function MyMatchingsPage({ role, onOpenBooking }: Props) {
     color: p.status === "paid" ? "green" : "amber",
   }));
 
-  /* ── 선택 날짜 → DateDetail items ── */
-  const bookingDateItems = bookingSelDate
-    ? lessonBookings
-        .filter((b) => b.lessonDate === bookingSelDate && b.status !== "rejected")
-        .map((b) => ({
-          avatar: b.avatar, tutor: b.tutor, subject: b.subject,
-          startTime: b.startTime, endTime: b.endTime,
-          badge: <BookingStatusBadge status={b.status} />,
-        }))
-    : [];
-
-  const paymentDateItems = paymentSelDate
-    ? payments
-        .filter((p) => p.lessonDate === paymentSelDate)
-        .map((p) => ({
-          avatar: p.avatar, tutor: p.tutor, subject: p.subject,
-          startTime: p.startTime, endTime: p.endTime,
-          badge: p.status === "paid"
-            ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><CheckCircle2 size={11}/> 결제 완료</span>
-            : <button onClick={() => { const item = payments.find(x=>x.lessonDate===paymentSelDate); if(item) setPayingItem(item); }}
-                className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer">
-                <CreditCard size={11}/> 결제하기
-              </button>,
-        }))
-    : [];
 
   const TABS = [
     { key: "requests" as const,  label: "보낸 요청" },
@@ -191,9 +149,27 @@ export default function MyMatchingsPage({ role, onOpenBooking }: Props) {
         </div>
       )}
 
+      {/* 튜터 탭 네비게이션 */}
       {isTutor && (
-        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-xs font-medium text-primary">
-          <GraduationCap size={13}/> 튜터 계정 — 받은 요청
+        <div className="flex gap-1 bg-muted p-1 rounded-xl w-fit">
+          {([
+            { key: "received" as const, label: "받은 요청",  badge: tutorMatchings.filter(m=>m.status==="pending").length },
+            { key: "lessons"  as const, label: "수업 요청",  badge: lessonRequests.filter(r=>r.status==="pending").length },
+            { key: "schedule" as const, label: "스케줄 관리", badge: 0 },
+            { key: "revenue"  as const, label: "수익 관리",   badge: 0 },
+          ]).map(({ key, label, badge }) => (
+            <button key={key} onClick={() => setTutorTab(key)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                tutorTab === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}>
+              {label}
+              {badge > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tutorTab===key?"bg-accent text-white":"bg-accent/20 text-accent"}`}>
+                  {badge}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       )}
 
@@ -238,18 +214,18 @@ export default function MyMatchingsPage({ role, onOpenBooking }: Props) {
       {!isTutor && activeTab === "bookings" && (
         <div className="space-y-4">
           {/* 캘린더 */}
-          <MiniCalendar events={bookingEvents} selectedDate={bookingSelDate} onSelectDate={setBookingSelDate}/>
+          <MiniCalendar
+            events={bookingEvents}
+            selectedDate={bookingSelDate}
+            onSelectDate={(d) => setBookingSelDate(d)}
+            onClickDate={(d) => { setBookingSelDate(d); setBookingPopup(d); }}
+          />
 
           {/* 범례 */}
           <div className="flex items-center gap-4 px-1">
             <Legend cls="bg-primary/15 text-primary" label="예약 확정"/>
             <Legend cls="bg-amber-100 text-amber-700" label="대기 중"/>
           </div>
-
-          {/* 날짜 선택 시 상세 */}
-          {bookingSelDate && (
-            <DateDetail date={bookingSelDate} items={bookingDateItems} emptyMsg="이 날은 예약된 레슨이 없습니다."/>
-          )}
 
           {/* 전체 목록 */}
           <div className="bg-card rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
@@ -287,18 +263,18 @@ export default function MyMatchingsPage({ role, onOpenBooking }: Props) {
       {!isTutor && activeTab === "payments" && (
         <div className="space-y-4">
           {/* 캘린더 */}
-          <MiniCalendar events={paymentEvents} selectedDate={paymentSelDate} onSelectDate={setPaymentSelDate}/>
+          <MiniCalendar
+            events={paymentEvents}
+            selectedDate={paymentSelDate}
+            onSelectDate={(d) => setPaymentSelDate(d)}
+            onClickDate={(d) => { setPaymentSelDate(d); setPaymentPopup(d); }}
+          />
 
           {/* 범례 */}
           <div className="flex items-center gap-4 px-1">
             <Legend cls="bg-emerald-100 text-emerald-700" label="결제 완료"/>
             <Legend cls="bg-amber-100 text-amber-700" label="미결제"/>
           </div>
-
-          {/* 날짜 선택 시 상세 */}
-          {paymentSelDate && (
-            <DateDetail date={paymentSelDate} items={paymentDateItems} emptyMsg="이 날은 수업 내역이 없습니다."/>
-          )}
 
           {/* 전체 결제 목록 */}
           <div className="bg-card rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
@@ -376,43 +352,377 @@ export default function MyMatchingsPage({ role, onOpenBooking }: Props) {
       {/* ══════════════════════════════
           받은 요청 탭 (튜터)
       ══════════════════════════════ */}
-      {isTutor && (
+      {isTutor && tutorTab === "received" && (
         <div className="bg-card rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-          <div className={`${COL} px-5 py-3 bg-muted/60 border-b border-border`}>
-            <span/><span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">요청 정보</span>
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">상태</span>
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">액션</span>
+          {/* 헤더 — 액션 열 없음 */}
+          <div className="grid grid-cols-[44px_1fr_90px_20px] items-center gap-x-4 px-5 py-3 bg-muted/60 border-b border-border">
+            <span/>
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">요청 정보</span>
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">상태</span>
+            <span/>
           </div>
-          {tutorMatchings.map((m, i) => (
-            <div key={m.id} className={`${COL} px-5 py-4 hover:bg-muted/20 transition-colors ${i!==tutorMatchings.length-1?"border-b border-border":""}`}>
-              <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center">
-                <User size={18} className="text-primary"/>
-              </div>
-              <div className="min-w-0 pt-0.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-bold text-foreground">{m.student}</p>
-                  <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{m.subject}</span>
+
+          {tutorMatchings.map((m, i) => {
+            const isPending  = m.status === "pending";
+            const isAccepted = m.status === "accepted";
+            const isClickable = isPending || isAccepted;
+
+            const handleRowClick = () => {
+              if (isPending)  setApproveModalTarget(m);
+              if (isAccepted) onOpenStudentDetail(m.id);
+            };
+
+            return (
+              <div
+                key={m.id}
+                onClick={isClickable ? handleRowClick : undefined}
+                className={`grid grid-cols-[44px_1fr_90px_20px] items-start gap-x-4 px-5 py-4 transition-colors ${
+                  i !== tutorMatchings.length - 1 ? "border-b border-border" : ""
+                } ${isClickable ? "cursor-pointer hover:bg-muted/40" : "hover:bg-muted/10"}`}
+              >
+                {/* 아바타 */}
+                <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center">
+                  <User size={18} className="text-primary" />
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{m.date} · {m.time}</p>
-                <div className="mt-1.5 max-w-xs"><ExpandableMessage text={m.message}/></div>
-              </div>
-              <div className="flex items-center h-11"><StatusBadge status={m.status}/></div>
-              <div className="flex items-center h-11">
-                {m.status === "pending" ? (
-                  <div className="flex gap-1.5">
-                    <button className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors cursor-pointer flex items-center gap-1">
-                      <CheckCircle2 size={12}/> 승인
-                    </button>
-                    <button className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors cursor-pointer flex items-center gap-1">
-                      <XCircle size={12}/> 거절
-                    </button>
+
+                {/* 정보 */}
+                <div className="min-w-0 pt-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-bold text-foreground">{m.student}</p>
+                    <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{m.subject}</span>
+                    {isAccepted && m.lessonFee && (
+                      <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[11px] font-semibold">
+                        {m.lessonFee.toLocaleString()}원/회
+                      </span>
+                    )}
                   </div>
-                ) : <span/>}
+                  <p className="text-xs text-muted-foreground mt-0.5">{m.date} · {m.time}</p>
+                  <div className="mt-1.5 max-w-xs" onClick={(e) => e.stopPropagation()}>
+                    <ExpandableMessage text={m.message} />
+                  </div>
+                </div>
+
+                {/* 상태 */}
+                <div className="flex items-center h-11">
+                  <StatusBadge status={m.status} />
+                </div>
+
+                {/* Chevron */}
+                <div className="flex items-center h-11">
+                  {isClickable
+                    ? <ChevronRight size={15} className="text-muted-foreground" />
+                    : <span />}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {/* ══════════════════════════════
+          수업 요청 탭 (튜터) — 캘린더 + 목록
+      ══════════════════════════════ */}
+      {isTutor && tutorTab === "lessons" && (() => {
+        const reqEvents: CalEvent[] = lessonRequests.map((r) => ({
+          date: r.lessonDate,
+          label: `${r.startTime} ${r.student}`,
+          color: r.status === "confirmed" ? "green" : r.status === "rejected" ? "red" : "amber",
+        }));
+
+        const reqDateItems = lessonReqSelDate
+          ? lessonRequests
+              .filter((r) => r.lessonDate === lessonReqSelDate)
+              .map((r) => ({
+                avatar: "",
+                tutor: r.student,
+                subject: r.subject,
+                startTime: r.startTime,
+                endTime: r.endTime,
+                badge: r.status === "confirmed"
+                  ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><CheckCircle2 size={11}/> 승인됨</span>
+                  : r.status === "rejected"
+                    ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-600">거절됨</span>
+                    : <button onClick={() => setLessonReqModal(r)}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer whitespace-nowrap">
+                        검토하기
+                      </button>,
+              }))
+          : [];
+
+        return (
+          <div className="space-y-4">
+            {/* 캘린더 */}
+            <MiniCalendar
+              events={reqEvents}
+              selectedDate={lessonReqSelDate}
+              onSelectDate={(d) => { setLessonReqSelDate(d); }}
+              onClickDate={(d) => { setLessonReqSelDate(d); setLessonReqPopup(d); }}
+            />
+
+            {/* 범례 */}
+            <div className="flex items-center gap-4 px-1">
+              <Legend cls="bg-emerald-100 text-emerald-700" label="승인됨"/>
+              <Legend cls="bg-amber-100 text-amber-700" label="대기 중"/>
+              <Legend cls="bg-red-100 text-red-600" label="거절됨"/>
+            </div>
+
+            {/* 전체 목록 */}
+            <div className="bg-card rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+              <div className="px-5 py-3 border-b border-border bg-muted/60">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">전체 수업 요청</p>
+              </div>
+              <div className="grid grid-cols-[44px_1fr_auto_100px_20px] items-center gap-x-4 px-5 py-2.5 bg-muted/30 border-b border-border">
+                <span/>
+                <span className="text-[11px] font-semibold text-muted-foreground">학생 정보</span>
+                <span className="text-[11px] font-semibold text-muted-foreground">수업 일시</span>
+                <span className="text-[11px] font-semibold text-muted-foreground">상태</span>
+                <span/>
+              </div>
+              {lessonRequests.length === 0
+                ? <p className="text-center text-sm text-muted-foreground py-10">수업 요청이 없습니다.</p>
+                : lessonRequests.map((r, i) => {
+                    const isPending = r.status === "pending";
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={isPending ? () => setLessonReqModal(r) : undefined}
+                        className={`grid grid-cols-[44px_1fr_auto_100px_20px] items-center gap-x-4 px-5 py-4 transition-colors ${
+                          i !== lessonRequests.length - 1 ? "border-b border-border" : ""
+                        } ${isPending ? "cursor-pointer hover:bg-muted/40" : "hover:bg-muted/10"}`}
+                      >
+                        {/* 아이콘 */}
+                        <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center">
+                          <User size={18} className="text-primary" />
+                        </div>
+                        {/* 학생 정보 */}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-bold text-foreground">{r.student}</p>
+                            <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{r.subject}</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">요청: {r.requestedAt}</p>
+                        </div>
+                        {/* 일시 */}
+                        <div className="text-right">
+                          <p className="text-xs font-semibold text-foreground flex items-center gap-1 justify-end">
+                            <Calendar size={11} className="text-muted-foreground"/> {fmtDate(r.lessonDate, r.lessonDay)}
+                          </p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end mt-0.5">
+                            <Clock size={11}/> {r.startTime} – {r.endTime}
+                          </p>
+                        </div>
+                        {/* 상태 */}
+                        <BookingStatusBadge status={r.status} />
+                        {/* Chevron */}
+                        <div className="flex items-center justify-end">
+                          {isPending ? <ChevronRight size={15} className="text-muted-foreground" /> : <span />}
+                        </div>
+                      </div>
+                    );
+                  })
+              }
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ══════════════════════════════
+          스케줄 관리 탭 (튜터)
+      ══════════════════════════════ */}
+      {isTutor && tutorTab === "schedule" && <SchedulePage />}
+
+      {/* ══════════════════════════════
+          수익 관리 탭 (튜터)
+      ══════════════════════════════ */}
+      {isTutor && tutorTab === "revenue" && <TutorRevenuePanel />}
+
+      {/* 레슨 예약 날짜 팝업 */}
+      {bookingPopup && (() => {
+        const WDAYS = ["일","월","화","수","목","금","토"];
+        const [py, pm, pd] = bookingPopup.split("-").map(Number);
+        const dow = WDAYS[new Date(bookingPopup).getDay()];
+        const items = lessonBookings.filter((b) => b.lessonDate === bookingPopup && b.status !== "rejected");
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
+            onClick={() => setBookingPopup(null)}
+          >
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+                <div>
+                  <p className="text-sm font-bold text-foreground">레슨 예약</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{py}년 {pm}월 {pd}일 ({dow})</p>
+                </div>
+                <button onClick={() => setBookingPopup(null)} className="p-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer">
+                  <span className="text-muted-foreground text-lg leading-none">×</span>
+                </button>
+              </div>
+              {items.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-10">이 날은 예약된 레슨이 없습니다.</p>
+              ) : (
+                items.map((b, i) => (
+                  <div key={b.id} className={`flex items-center gap-4 px-5 py-4 ${i !== items.length - 1 ? "border-b border-border" : ""}`}>
+                    <img src={b.avatar} alt={b.tutor} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-foreground">{b.tutor}</p>
+                        <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{b.subject}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                        <Clock size={11}/> {b.startTime} – {b.endTime}
+                      </p>
+                    </div>
+                    <BookingStatusBadge status={b.status} />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 결제 날짜 팝업 */}
+      {paymentPopup && (() => {
+        const WDAYS = ["일","월","화","수","목","금","토"];
+        const [py, pm, pd] = paymentPopup.split("-").map(Number);
+        const dow = WDAYS[new Date(paymentPopup).getDay()];
+        const items = payments.filter((p) => p.lessonDate === paymentPopup);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
+            onClick={() => setPaymentPopup(null)}
+          >
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+                <div>
+                  <p className="text-sm font-bold text-foreground">결제</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{py}년 {pm}월 {pd}일 ({dow})</p>
+                </div>
+                <button onClick={() => setPaymentPopup(null)} className="p-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer">
+                  <span className="text-muted-foreground text-lg leading-none">×</span>
+                </button>
+              </div>
+              {items.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-10">이 날은 수업 내역이 없습니다.</p>
+              ) : (
+                items.map((p, i) => (
+                  <div key={p.id} className={`px-5 py-4 ${i !== items.length - 1 ? "border-b border-border" : ""}`}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <img src={p.avatar} alt={p.tutor} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-foreground">{p.tutor}</p>
+                          <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">{p.subject}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                          <Clock size={11}/> {p.startTime} – {p.endTime}
+                        </p>
+                      </div>
+                      <p className="text-sm font-bold text-foreground shrink-0">{p.price.toLocaleString()}원</p>
+                    </div>
+                    {p.status === "paid" ? (
+                      <div>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                          <CheckCircle2 size={11}/> 결제 완료
+                        </span>
+                        {p.paidAt && <p className="text-[10px] text-muted-foreground mt-1">{p.paidAt}</p>}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setPayingItem(p); setPaymentPopup(null); }}
+                        className="w-full flex items-center justify-center gap-2 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors cursor-pointer"
+                      >
+                        <CreditCard size={13}/> 결제하기
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 수업 요청 날짜 팝업 */}
+      {lessonReqPopup && (() => {
+        const WDAYS = ["일","월","화","수","목","금","토"];
+        const [py, pm, pd] = lessonReqPopup.split("-").map(Number);
+        const dow = WDAYS[new Date(lessonReqPopup).getDay()];
+        const items = lessonRequests.filter((r) => r.lessonDate === lessonReqPopup);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
+            onClick={() => setLessonReqPopup(null)}
+          >
+            <div
+              className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 헤더 */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+                <div>
+                  <p className="text-sm font-bold text-foreground">수업 요청</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{py}년 {pm}월 {pd}일 ({dow})</p>
+                </div>
+                <button
+                  onClick={() => setLessonReqPopup(null)}
+                  className="p-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <span className="text-muted-foreground text-lg leading-none">×</span>
+                </button>
+              </div>
+
+              {/* 요청 목록 */}
+              {items.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-10">이 날은 수업 요청이 없습니다.</p>
+              ) : (
+                items.map((r, i) => (
+                  <div
+                    key={r.id}
+                    className={`px-5 py-4 ${i !== items.length - 1 ? "border-b border-border" : ""}`}
+                  >
+                    {/* 학생 + 과목 */}
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                          <User size={15} className="text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-foreground">{r.student}</p>
+                          <span className="text-[11px] text-muted-foreground">{r.subject}</span>
+                        </div>
+                      </div>
+                      {r.status === "confirmed"
+                        ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 shrink-0"><CheckCircle2 size={11}/> 승인됨</span>
+                        : r.status === "rejected"
+                          ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-600 shrink-0">거절됨</span>
+                          : <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 shrink-0">대기 중</span>
+                      }
+                    </div>
+                    {/* 시간 */}
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                      <Clock size={11}/> {r.startTime} – {r.endTime}
+                    </p>
+                    {/* 메시지 */}
+                    {r.message && (
+                      <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 mt-2 leading-relaxed">{r.message}</p>
+                    )}
+                    {/* 검토 버튼 */}
+                    {r.status === "pending" && (
+                      <button
+                        onClick={() => { setLessonReqModal(r); setLessonReqPopup(null); }}
+                        className="mt-3 w-full py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors cursor-pointer"
+                      >
+                        검토하기
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 결제 모달 */}
       {payingItem && (
@@ -420,6 +730,49 @@ export default function MyMatchingsPage({ role, onOpenBooking }: Props) {
           item={payingItem}
           onClose={() => setPayingItem(null)}
           onPaid={(id) => { handlePaid(id); setTimeout(() => setPayingItem(null), 1800); }}
+        />
+      )}
+
+      {/* 승인 / 거절 모달 */}
+      {approveModalTarget && (
+        <ApproveRejectModal
+          matching={approveModalTarget}
+          onClose={() => setApproveModalTarget(null)}
+          onApprove={(id) => {
+            onApproveMatching(id);
+            setApproveModalTarget(null);
+          }}
+          onReject={(id) => {
+            onRejectMatching(id);
+            setApproveModalTarget(null);
+          }}
+        />
+      )}
+
+      {/* 수업 요청 승인/거절 모달 */}
+      {lessonReqModal && (
+        <ApproveRejectModal
+          matching={{
+            id: lessonReqModal.id,
+            student: lessonReqModal.student,
+            subject: lessonReqModal.subject,
+            date: `${lessonReqModal.lessonDate} (${lessonReqModal.lessonDay})`,
+            time: `${lessonReqModal.startTime} – ${lessonReqModal.endTime}`,
+            message: lessonReqModal.message,
+          }}
+          onClose={() => setLessonReqModal(null)}
+          onApprove={(id) => {
+            setLessonRequests((prev) =>
+              prev.map((r) => r.id === id ? { ...r, status: "confirmed" } : r)
+            );
+            setLessonReqModal(null);
+          }}
+          onReject={(id) => {
+            setLessonRequests((prev) =>
+              prev.map((r) => r.id === id ? { ...r, status: "rejected" } : r)
+            );
+            setLessonReqModal(null);
+          }}
         />
       )}
     </div>

@@ -19,6 +19,7 @@ import {
 import type { Role } from "../types";
 import { TUTORS, REVIEWS } from "../data/mockData";
 import StarRow from "../components/StarRow";
+import { FloatingChat } from "../components/ChatPanel";
 
 interface Props {
   tutorId: number;
@@ -324,6 +325,13 @@ export default function TutorDetailPage({ tutorId, role, onBack, onRequestMatchi
       </div>
 
       {/* ── 리뷰 작성 (학생만) ── */}
+      {/* 플로팅 채팅 버튼 */}
+      <FloatingChat
+        tutorName={tutor.name}
+        tutorAvatar={tutor.avatar}
+        tutorSubject={tutor.subject}
+      />
+
       {role === "student" && (
         <div className="bg-card border border-border rounded-2xl p-5">
           <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">

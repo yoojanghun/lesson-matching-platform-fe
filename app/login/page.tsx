@@ -1,12 +1,37 @@
-"use client";
-import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useUser, MOCK_ACCOUNTS, type TestAccount } from '../components/UserContext';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const router = useRouter();
+  const { login, quickLogin } = useUser();
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!email.trim() || !password) {
+      setError('이메일과 비밀번호를 모두 입력해 주세요.');
+      return;
+    }
+
+    const success = login(email, password);
+    if (success) {
+      setError('');
+      router.push('/');
+    } else {
+      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+    }
+  };
+
+  const handleQuickLogin = (account: TestAccount) => {
+    quickLogin(account);
+    router.push('/');
+  };
 
   return (
     <div className="max-w-sm mx-auto space-y-6 py-4">
@@ -15,14 +40,50 @@ export default function LoginPage() {
         <p className="text-sm text-muted-foreground">계정에 접속하세요</p>
       </div>
 
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      {/* 빠른 로그인 (테스트 계정) */}
+      <div className="bg-secondary/60 border border-border/80 rounded-2xl p-4 space-y-2.5">
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+          테스트 계정으로 빠른 로그인
+        </p>
+        <div className="flex gap-2">
+          {MOCK_ACCOUNTS.map((a) => (
+            <button
+              key={a.email}
+              type="button"
+              onClick={() => handleQuickLogin(a)}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 border-primary/20 bg-card text-primary hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer shadow-sm"
+            >
+              {a.role === 'STUDENT' ? '학생 계정' : '튜터 계정'}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-1 pt-1">
+          {MOCK_ACCOUNTS.map((a) => (
+            <div key={a.email} className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="font-medium">{a.role === 'STUDENT' ? '학생' : '튜터'}</span>
+              <span className="font-mono">{a.email} / {a.password}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-xs text-muted-foreground">또는 직접 입력</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
         {/* Email */}
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1.5">이메일</label>
           <input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError('');
+            }}
             className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors"
             placeholder="example@email.com"
           />
@@ -32,19 +93,30 @@ export default function LoginPage() {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-xs font-semibold text-foreground">비밀번호</label>
-            <button className="text-xs text-accent hover:underline cursor-pointer">비밀번호 찾기</button>
+            <button type="button" className="text-xs text-accent hover:underline cursor-pointer">
+              비밀번호 찾기
+            </button>
           </div>
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError('');
+            }}
             className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors"
             placeholder="비밀번호를 입력하세요"
           />
         </div>
 
-        <button 
-          onClick={() => router.push('/')}
+        {error && (
+          <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-200">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
           className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors cursor-pointer"
         >
           로그인
@@ -57,8 +129,11 @@ export default function LoginPage() {
         </div>
 
         {/* Google OAuth */}
-        <a
-          href="/oauth2/authorization/google"
+        <button
+          type="button"
+          onClick={() => {
+            handleQuickLogin(MOCK_ACCOUNTS[0]);
+          }}
           className="w-full flex items-center justify-center gap-3 py-2.5 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
         >
           <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
@@ -68,11 +143,11 @@ export default function LoginPage() {
             <path d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" fill="#1976D2" />
           </svg>
           Google로 로그인
-        </a>
-      </div>
+        </button>
+      </form>
 
       <p className="text-center text-xs text-muted-foreground">
-        아직 계정이 없으신가요?{" "}
+        아직 계정이 없으신가요?{' '}
         <Link href="/signup" className="text-accent font-medium hover:underline">
           회원가입
         </Link>

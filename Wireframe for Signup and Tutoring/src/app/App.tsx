@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Menu, X, CheckCircle2 } from "lucide-react";
-import type { Page, Role } from "../types";
+import { Menu, X, CheckCircle2, MessageCircle } from "lucide-react";
+import type { Page, Role, TutorMatching } from "../types";
+import { MY_MATCHINGS_TUTOR } from "../data/mockData";
 import HomePage from "../pages/HomePage";
 import TutorsPage from "../pages/TutorsPage";
 import TutorDetailPage from "../pages/TutorDetailPage";
@@ -10,6 +11,9 @@ import MyMatchingsPage from "../pages/MyMatchingsPage";
 import MatchingRequestPage from "../pages/MatchingRequestPage";
 import BookingPage from "../pages/BookingPage";
 import SchedulePage from "../pages/SchedulePage";
+import ChatListPage from "../pages/ChatListPage";
+import TutorStudentDetailPage from "../pages/TutorStudentDetailPage";
+import AIAssistant from "../components/AIAssistant";
 
 const NAV_ITEMS_COMMON: { label: string; page: Page }[] = [
   { label: "홈", page: "home" },
@@ -19,7 +23,6 @@ const NAV_ITEMS_COMMON: { label: string; page: Page }[] = [
 const NAV_ITEMS_TUTOR: { label: string; page: Page }[] = [
   { label: "홈", page: "home" },
   { label: "내 매칭", page: "my-matchings" },
-  { label: "스케줄 관리", page: "schedule" },
 ];
 
 export default function App() {
@@ -30,6 +33,14 @@ export default function App() {
   const [selectedMatchingId, setSelectedMatchingId] = useState<number>(1);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
+
+  /* 튜터 매칭 목록 — MyMatchingsPage와 TutorStudentDetailPage 공유 */
+  const [tutorMatchingsList, setTutorMatchingsList] = useState<TutorMatching[]>(
+    MY_MATCHINGS_TUTOR.map((m) => ({ ...m, lessonFee: undefined }))
+  );
+  const [selectedTutorMatchingId, setSelectedTutorMatchingId] = useState<number | null>(null);
+
+  const selectedTutorMatching = tutorMatchingsList.find((m) => m.id === selectedTutorMatchingId) ?? null;
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -82,7 +93,9 @@ export default function App() {
                 key={p}
                 onClick={() => setPage(p)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                  page === p ? "bg-secondary text-primary" : "text-muted-foreground hover:text-foreground"
+                  page === p || (page === "tutor-student-detail" && p === "my-matchings")
+                    ? "bg-secondary text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {label}
@@ -198,6 +211,17 @@ export default function App() {
           <MyMatchingsPage
             role={role}
             onOpenBooking={(id) => { setSelectedMatchingId(id); setPage("booking"); }}
+            tutorMatchingsList={tutorMatchingsList}
+            onApproveMatching={(id) =>
+              setTutorMatchingsList((prev) => prev.map((m) => m.id === id ? { ...m, status: "accepted" } : m))
+            }
+            onRejectMatching={(id) =>
+              setTutorMatchingsList((prev) => prev.map((m) => m.id === id ? { ...m, status: "rejected" } : m))
+            }
+            onOpenStudentDetail={(id) => {
+              setSelectedTutorMatchingId(id);
+              setPage("tutor-student-detail");
+            }}
           />
         )}
         {page === "booking" && (
@@ -214,8 +238,34 @@ export default function App() {
             onSubmit={handleMatchingSubmit}
           />
         )}
+        {page === "tutor-student-detail" && selectedTutorMatching && (
+          <TutorStudentDetailPage
+            matching={selectedTutorMatching}
+            onBack={() => setPage("my-matchings")}
+            onUpdateFee={(id, fee) =>
+              setTutorMatchingsList((prev) => prev.map((m) => m.id === id ? { ...m, lessonFee: fee } : m))
+            }
+          />
+        )}
         {page === "schedule" && <SchedulePage />}
+        {page === "chat" && <ChatListPage />}
       </main>
+
+      {/* AI 어시스턴트 — 항상 표시 */}
+      <AIAssistant onViewTutor={(id) => { setSelectedTutorId(id); setPage("tutor-detail"); }} />
+
+      {/* 플로팅 채팅 버튼 (로그인 시, 튜터 프로필 제외) */}
+      {role && page !== "tutor-detail" && (
+        <button
+          onClick={() => setPage("chat")}
+          className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 hover:scale-105 transition-all cursor-pointer"
+        >
+          <MessageCircle size={22} />
+          {page !== "chat" && (
+            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center">3</span>
+          )}
+        </button>
+      )}
 
       {/* Toast */}
       {toast && (

@@ -7,9 +7,29 @@ export type Page =
   | "my-matchings"
   | "matching-request"
   | "booking"
-  | "schedule";
+  | "schedule"
+  | "chat"
+  | "tutor-student-detail";
 
 export type Role = "STUDENT" | "TUTOR" | "GUEST";
+
+export interface ChatMessage {
+  id: number;
+  from: "me" | "tutor";
+  text: string;
+  time: string;
+}
+
+export interface Conversation {
+  id: number;
+  tutorId: number;
+  tutorName: string;
+  tutorAvatar: string;
+  tutorSubject: string;
+  online: boolean;
+  unread: number;
+  messages: ChatMessage[];
+}
 
 export interface LessonOption {
   label: string;
@@ -72,6 +92,32 @@ export interface TutorMatching {
   time: string;
   status: "pending" | "accepted" | "rejected";
   message: string;
+  lessonFee?: number;
+}
+
+export interface TutorStudentLesson {
+  id: number;
+  lessonDate: string;
+  lessonDay: string;
+  startTime: string;
+  endTime: string;
+  fee: number;
+  paid: boolean;
+  paidAt?: string;
+}
+
+export interface TutorLessonRequest {
+  id: number;
+  student: string;
+  subject: string;
+  lessonDate: string;
+  lessonDay: string;
+  startTime: string;
+  endTime: string;
+  price: number;
+  status: "pending" | "confirmed" | "rejected";
+  requestedAt: string;
+  message: string;
 }
 
 export interface PaymentItem {
@@ -101,3 +147,6 @@ export interface LessonBooking {
   status: "pending" | "confirmed" | "rejected";
   requestedAt: string;     // 예약 신청 일시
 }
+
+
+

@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, useEffect } from "react";
 import { RotateCcw, Copy, CheckCircle2, Clock } from "lucide-react";
 
@@ -28,16 +30,21 @@ function formatRanges(slots: Set<number>): string {
   if (!slots.size) return "선택 없음";
   const arr = [...slots].sort((a, b) => a - b);
   const out: string[] = [];
-  let s = arr[0], p = arr[0];
+  let s = arr[0],
+    p = arr[0];
   for (let i = 1; i < arr.length; i++) {
-    if (arr[i] === p + 1) { p = arr[i]; }
-    else { out.push(`${slotTime(s)} – ${slotTime(p + 1)}`); s = p = arr[i]; }
+    if (arr[i] === p + 1) {
+      p = arr[i];
+    } else {
+      out.push(`${slotTime(s)} – ${slotTime(p + 1)}`);
+      s = p = arr[i];
+    }
   }
   out.push(`${slotTime(s)} – ${slotTime(p + 1)}`);
   return out.join("  ·  ");
 }
 
-export default function SchedulePage() {
+export default function SchedulePlanner() {
   const [week, setWeek] = useState<WeekSlots>(makeEmpty);
   const [saved, setSaved] = useState(false);
 
@@ -45,7 +52,10 @@ export default function SchedulePage() {
   const dragRef = useRef<{ day: Day; start: number; mode: "on" | "off" } | null>(null);
 
   useEffect(() => {
-    const up = () => { dragRef.current = null; baseRef.current = null; };
+    const up = () => {
+      dragRef.current = null;
+      baseRef.current = null;
+    };
     window.addEventListener("mouseup", up);
     return () => window.removeEventListener("mouseup", up);
   }, []);
@@ -77,7 +87,9 @@ export default function SchedulePage() {
     setWeek(Object.fromEntries(DAYS.map((d) => [d, new Set(m)])) as WeekSlots);
   };
 
-  const reset = () => setWeek(makeEmpty());
+  const reset = () => {
+    setWeek(makeEmpty());
+  };
 
   const handleSave = () => {
     setSaved(true);
@@ -88,45 +100,48 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-5">
-      {/* 상단 액션 */}
+      {/* 상단 액션 바 */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-xs text-muted-foreground">
           클릭 또는 드래그로 레슨 가능 시간 선택 ·{" "}
-          <span className="font-medium text-foreground">30분 단위</span>
+          <span className="font-semibold text-foreground">30분 단위</span>
         </p>
         <div className="flex gap-2">
           <button
             onClick={copyMonday}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-muted transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer bg-card"
           >
-            <Copy size={11} /> 월요일 기준 전체 적용
+            <Copy size={13} /> 월요일 기준 전체 적용
           </button>
           <button
             onClick={reset}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer bg-card"
           >
-            <RotateCcw size={11} /> 초기화
+            <RotateCcw size={13} /> 초기화
           </button>
         </div>
       </div>
 
       {/* 그리드 전체 */}
-      <div className="bg-card rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden">
         <div className="overflow-x-auto">
           <div style={{ minWidth: 48 + GRID_W + 16 }}>
-
             {/* 시간 헤더 */}
-            <div className="flex items-end border-b border-border bg-muted/40 px-2 py-2">
+            <div className="flex items-end border-b border-border bg-muted/40 px-2 py-2.5">
               <div style={{ width: 48 }} className="shrink-0" />
               <div className="flex" style={{ width: GRID_W }}>
                 {HOURS.map((h) => (
                   <div key={h} style={{ width: CELL_W * 2 }}>
-                    <span className="text-[10px] font-medium text-muted-foreground">{h}:00</span>
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      {h}:00
+                    </span>
                   </div>
                 ))}
-                {/* 마지막 23:00 레이블 */}
+                {/* 마지막 23 레이블 */}
                 <div style={{ width: CELL_W }}>
-                  <span className="text-[10px] font-medium text-muted-foreground">{END_HOUR}</span>
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    {END_HOUR}
+                  </span>
                 </div>
               </div>
             </div>
@@ -137,11 +152,21 @@ export default function SchedulePage() {
               const hasSlots = slots.size > 0;
 
               return (
-                <div key={day} className={di < DAYS.length - 1 ? "border-b border-border" : ""}>
+                <div
+                  key={day}
+                  className={di < DAYS.length - 1 ? "border-b border-border" : ""}
+                >
                   {/* 슬롯 행 */}
                   <div className="flex items-center px-2 pt-3">
-                    <div style={{ width: 48 }} className="shrink-0 flex items-center justify-center">
-                      <span className={`text-sm font-bold ${hasSlots ? "text-primary" : "text-muted-foreground"}`}>
+                    <div
+                      style={{ width: 48 }}
+                      className="shrink-0 flex items-center justify-center"
+                    >
+                      <span
+                        className={`text-sm font-bold ${
+                          hasSlots ? "text-primary" : "text-muted-foreground"
+                        }`}
+                      >
                         {day}
                       </span>
                     </div>
@@ -154,7 +179,8 @@ export default function SchedulePage() {
                       {Array.from({ length: TOTAL_SLOTS }, (_, slot) => {
                         const on = slots.has(slot);
                         const prevOn = slot > 0 && slots.has(slot - 1);
-                        const nextOn = slot < TOTAL_SLOTS - 1 && slots.has(slot + 1);
+                        const nextOn =
+                          slot < TOTAL_SLOTS - 1 && slots.has(slot + 1);
                         const isHourBoundary = slot % 2 === 0 && slot > 0;
 
                         return (
@@ -183,11 +209,22 @@ export default function SchedulePage() {
 
                   {/* 선택 시간 요약 */}
                   <div
-                    className="flex items-center gap-1.5 pb-2.5 pt-1.5"
+                    className="flex items-center gap-1.5 pb-3 pt-1.5"
                     style={{ paddingLeft: 56 }}
                   >
-                    <Clock size={10} className={hasSlots ? "text-primary" : "text-muted-foreground"} />
-                    <span className={`text-xs ${hasSlots ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                    <Clock
+                      size={11}
+                      className={
+                        hasSlots ? "text-primary" : "text-muted-foreground"
+                      }
+                    />
+                    <span
+                      className={`text-xs ${
+                        hasSlots
+                          ? "text-foreground font-medium"
+                          : "text-muted-foreground"
+                      }`}
+                    >
                       {formatRanges(slots)}
                     </span>
                   </div>
@@ -199,27 +236,29 @@ export default function SchedulePage() {
       </div>
 
       {/* 범례 + 저장 */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
-            <div className="w-6 h-3 rounded-sm bg-primary" />
+            <div className="w-6 h-3 rounded-full bg-primary" />
             <span className="text-xs text-muted-foreground">레슨 가능</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-6 h-3 rounded-sm bg-muted border border-border" />
+            <div className="w-6 h-3 rounded-full bg-muted border border-border" />
             <span className="text-xs text-muted-foreground">불가능</span>
           </div>
         </div>
         <button
           onClick={handleSave}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-7 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer shadow-sm ${
             saved
               ? "bg-emerald-500 text-white"
               : "bg-primary text-primary-foreground hover:bg-primary/90"
           }`}
         >
           {saved ? (
-            <><CheckCircle2 size={14} /> 저장 완료!</>
+            <>
+              <CheckCircle2 size={15} /> 저장 완료!
+            </>
           ) : (
             "스케줄 저장"
           )}

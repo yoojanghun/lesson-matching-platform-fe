@@ -7,7 +7,7 @@ export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: (
   return (
     <div
       onClick={onClick}
-      className="border border-border rounded-xl p-5 cursor-pointer bg-card"
+      className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group"
     >
       <div className="flex items-start gap-4">
         <div className="relative shrink-0">

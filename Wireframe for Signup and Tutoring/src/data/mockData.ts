@@ -1,5 +1,5 @@
 import { Music, Guitar, Mic2, Piano, Drum, Waves, PenLine } from "lucide-react";
-import type { Tutor, Review, StudentMatching, TutorMatching, LessonBooking, PaymentItem } from "../types";
+import type { Tutor, Review, StudentMatching, TutorMatching, LessonBooking, PaymentItem, TutorLessonRequest, TutorStudentLesson } from "../types";
 
 export const CATEGORIES = [
   { icon: Piano, label: "피아노", count: 134 },
@@ -157,6 +157,61 @@ export const MY_MATCHINGS_STUDENT: StudentMatching[] = [
 export const MY_MATCHINGS_TUTOR: TutorMatching[] = [
   { id: 1, student: "김민수", subject: "수학 · 통계", date: "2026-07-06", time: "일요일 오후 3시", status: "pending", message: "수능 수학 개념 정리가 필요해요." },
   { id: 2, student: "이지영", subject: "수학 · 통계", date: "2026-07-02", time: "수요일 오후 5시", status: "accepted", message: "미적분 심화 문제 풀이 원합니다." },
+];
+
+/* 승인된 학생별 레슨 이력 (결제 포함) */
+export const TUTOR_STUDENT_LESSONS: Record<string, TutorStudentLesson[]> = {
+  "이지영": [
+    { id: 1, lessonDate: "2026-07-03", lessonDay: "금", startTime: "14:00", endTime: "15:00", fee: 40000, paid: true, paidAt: "2026-07-03 16:10" },
+    { id: 2, lessonDate: "2026-07-10", lessonDay: "금", startTime: "14:00", endTime: "15:00", fee: 40000, paid: true, paidAt: "2026-07-10 15:55" },
+    { id: 3, lessonDate: "2026-07-17", lessonDay: "금", startTime: "14:00", endTime: "15:00", fee: 40000, paid: true, paidAt: "2026-07-17 16:30" },
+    { id: 4, lessonDate: "2026-07-24", lessonDay: "금", startTime: "14:00", endTime: "15:00", fee: 40000, paid: false },
+    { id: 5, lessonDate: "2026-07-31", lessonDay: "금", startTime: "14:00", endTime: "15:00", fee: 40000, paid: false },
+    { id: 6, lessonDate: "2026-08-13", lessonDay: "목", startTime: "10:00", endTime: "11:00", fee: 40000, paid: false },
+  ],
+};
+
+/* 매칭이 승인된 학생(이지영)만 수업 요청 가능 */
+export const TUTOR_LESSON_REQUESTS: TutorLessonRequest[] = [
+  {
+    id: 1,
+    student: "이지영",
+    subject: "수학 · 통계",
+    lessonDate: "2026-08-18",
+    lessonDay: "화",
+    startTime: "14:00",
+    endTime: "15:00",
+    price: 40000,
+    status: "pending",
+    requestedAt: "2026-08-15 10:30",
+    message: "미적분 심화 문제 위주로 수업 진행 부탁드립니다.",
+  },
+  {
+    id: 2,
+    student: "이지영",
+    subject: "수학 · 통계",
+    lessonDate: "2026-08-27",
+    lessonDay: "목",
+    startTime: "14:00",
+    endTime: "15:00",
+    price: 40000,
+    status: "pending",
+    requestedAt: "2026-08-16 14:22",
+    message: "지난 수업에 이어서 적분 파트 계속 부탁드립니다.",
+  },
+  {
+    id: 3,
+    student: "이지영",
+    subject: "수학 · 통계",
+    lessonDate: "2026-08-13",
+    lessonDay: "목",
+    startTime: "10:00",
+    endTime: "11:00",
+    price: 40000,
+    status: "confirmed",
+    requestedAt: "2026-08-10 09:00",
+    message: "이번 주 목요일 오전으로 부탁드립니다.",
+  },
 ];
 
 export const MY_LESSON_BOOKINGS: LessonBooking[] = [
