@@ -148,5 +148,43 @@ export interface LessonBooking {
   requestedAt: string;     // 예약 신청 일시
 }
 
+export interface BulletEntry {
+  id: number;
+  text: string;
+}
 
+export interface FeeEntry {
+  id: number;
+  type: string;   // e.g. "전공반", "취미반"
+  duration: string;
+  price: string;
+}
 
+export interface StudentProfile {
+  interests: string[];
+  goals: string[];
+  styles: string[];
+  styleNote: string;
+  lessonType: "대면 수업" | "온라인 수업" | "둘 다 가능" | "";
+  location: string;
+  budget: string;
+  days: string[];
+  times: string[];
+  memo: string;
+  updatedAt?: string;
+}
+
+export interface TutorProfileData {
+  name: string;
+  age: string;
+  location: string;
+  subjects: string[];
+  educations: BulletEntry[];
+  careers: BulletEntry[];
+  fees: FeeEntry[];
+  teachStyles: string[];
+  teachNote: string;
+  lessonType: "대면 수업" | "온라인 수업" | "둘 다 가능" | "";
+  intro: string;
+  updatedAt?: string;
+}

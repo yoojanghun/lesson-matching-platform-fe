@@ -10,17 +10,9 @@ import {
   CreditCard,
   Calendar,
   Clock,
-  Settings,
-  CalendarDays,
-  DollarSign,
-  Inbox,
-  Sparkles,
 } from "lucide-react";
 import {
-  MY_MATCHINGS_STUDENT,
   MY_MATCHINGS_TUTOR,
-  MY_LESSON_BOOKINGS,
-  MY_PAYMENTS,
   TUTOR_LESSON_REQUESTS,
   TUTORS,
 } from "../data/mockData";
@@ -36,6 +28,7 @@ import ApproveRejectModal from "../components/ApproveRejectModal";
 import TutorRevenuePanel from "../components/TutorRevenuePanel";
 import MiniCalendar, { type CalEvent } from "../components/MiniCalendar";
 import { useUser } from "../components/UserContext";
+import LoginGate from "../components/LoginGate";
 import BookingPage from "./BookingPage";
 import TutorStudentDetailPage from "./TutorStudentDetailPage";
 import SchedulePlanner from "../components/SchedulePlanner";
@@ -98,6 +91,16 @@ const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
 export default function MyMatchingsPage() {
   const { role, matchings, bookings, payments, payItem, payAllUnpaid } =
     useUser();
+
+  if (role === "GUEST") {
+    return (
+      <LoginGate
+        title="내 매칭 확인을 위해 로그인이 필요합니다"
+        description="로그인하시면 신청한 매칭 목록, 수업 예약 현황 및 결제 내역을 바로 확인하실 수 있습니다."
+      />
+    );
+  }
+
   const isTutor = role === "TUTOR";
 
   const todayStr = (() => {

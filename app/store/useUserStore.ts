@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { StudentMatching, Review, LessonBooking, PaymentItem } from '../types';
+import type { StudentMatching, Review, LessonBooking, PaymentItem, StudentProfile, TutorProfileData } from '../types';
 import { TUTORS, REVIEWS, MY_MATCHINGS_STUDENT, MY_LESSON_BOOKINGS, MY_PAYMENTS } from '../data/mockData';
 
 export type Role = 'GUEST' | 'STUDENT' | 'TUTOR';
@@ -25,6 +25,8 @@ export interface UserState {
   bookings: LessonBooking[];
   payments: PaymentItem[];
   reviews: Review[];
+  studentProfile: StudentProfile | null;
+  tutorProfile: TutorProfileData | null;
 
   // Actions
   showToast: (msg: string) => void;
@@ -40,6 +42,8 @@ export interface UserState {
   payItem: (id: number) => void;
   payAllUnpaid: () => void;
   addReview: (tutorId: number, rating: number, content: string) => void;
+  saveStudentProfile: (profile: StudentProfile) => void;
+  saveTutorProfile: (profile: TutorProfileData) => void;
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -54,6 +58,8 @@ export const useUserStore = create<UserState>()(
       bookings: MY_LESSON_BOOKINGS,
       payments: MY_PAYMENTS,
       reviews: REVIEWS,
+      studentProfile: null,
+      tutorProfile: null,
 
       showToast: (msg: string) => {
         if (toastTimer) clearTimeout(toastTimer);
@@ -195,6 +201,16 @@ export const useUserStore = create<UserState>()(
         }));
         get().showToast('리뷰가 성공적으로 등록되었습니다!');
       },
+
+      saveStudentProfile: (profile: StudentProfile) => {
+        set({ studentProfile: { ...profile, updatedAt: new Date().toISOString() } });
+        get().showToast('학생 프로필이 성공적으로 저장되었습니다!');
+      },
+
+      saveTutorProfile: (profile: TutorProfileData) => {
+        set({ tutorProfile: { ...profile, updatedAt: new Date().toISOString() } });
+        get().showToast('선생님 프로필이 성공적으로 저장되었습니다!');
+      },
     }),
     {
       name: 'tm_user_storage',
@@ -206,6 +222,8 @@ export const useUserStore = create<UserState>()(
         bookings: state.bookings,
         payments: state.payments,
         reviews: state.reviews,
+        studentProfile: state.studentProfile,
+        tutorProfile: state.tutorProfile,
       }),
     }
   )
