@@ -21,7 +21,9 @@ import {
 } from 'lucide-react';
 import { TUTORS, REVIEWS as INITIAL_REVIEWS } from '../../data/mockData';
 import StarRow from '../../components/StarRow';
-import { useUser } from '../../components/UserContext';
+import { useUserStore } from '../../store/useUserStore';
+import { useTutorDetailQuery } from '../../hooks/queries/useTutors';
+import { useReviewsQuery, useCreateReviewMutation } from '../../hooks/queries/useReviews';
 import { FloatingChat } from '../../components/ChatPanel';
 
 const RATING_DIST = [
@@ -37,8 +39,16 @@ export default function TutorDetailPage() {
   const router = useRouter();
   const params = useParams();
   const tutorId = Number(params.id);
-  const { role, reviews, addReview } = useUser();
-  const tutor = TUTORS.find((t) => t.id === tutorId) ?? TUTORS[0];
+
+  // Zustand Selector 최적화
+  const role = useUserStore((s) => s.role);
+
+  // TanStack Query로 튜터 상세 및 리뷰 데이터 조회 (자동 캐싱)
+  const { data: tutorQueryData, isLoading: tutorLoading } = useTutorDetailQuery(tutorId);
+  const { data: reviews = [] } = useReviewsQuery(tutorId);
+  const createReviewMutation = useCreateReviewMutation();
+
+  const tutor = tutorQueryData ?? TUTORS.find((t) => t.id === tutorId) ?? TUTORS[0];
 
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
@@ -54,7 +64,11 @@ export default function TutorDetailPage() {
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
     if (reviewRating === 0 || reviewText.trim().length < 5) return;
-    addReview(tutor.id, reviewRating, reviewText.trim());
+    createReviewMutation.mutate({
+      tutorId: tutor.id,
+      rating: reviewRating,
+      content: reviewText.trim(),
+    });
     setReviewText('');
     setReviewRating(0);
     setHoverRating(0);

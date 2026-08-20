@@ -16,22 +16,30 @@ import {
   TUTOR_LESSON_REQUESTS,
   TUTORS,
 } from "../data/mockData";
+import dynamic from "next/dynamic";
 import type {
   PaymentItem,
+  StudentMatching,
   TutorMatching,
   TutorLessonRequest,
 } from "../types";
 import StatusBadge from "../components/StatusBadge";
-import PaymentModal from "../components/PaymentModal";
-import LessonFeeModal from "../components/LessonFeeModal";
-import ApproveRejectModal from "../components/ApproveRejectModal";
-import TutorRevenuePanel from "../components/TutorRevenuePanel";
-import MiniCalendar, { type CalEvent } from "../components/MiniCalendar";
-import { useUser } from "../components/UserContext";
+import { useUserStore } from "../store/useUserStore";
+import { useMatchingsQuery } from "../hooks/queries/useMatchings";
+import { useBookingsQuery } from "../hooks/queries/useBookings";
+import { usePaymentsQuery, usePayItemMutation, usePayAllMutation } from "../hooks/queries/usePayments";
 import LoginGate from "../components/LoginGate";
 import BookingPage from "./BookingPage";
 import TutorStudentDetailPage from "./TutorStudentDetailPage";
-import SchedulePlanner from "../components/SchedulePlanner";
+import type { CalEvent } from "../components/MiniCalendar";
+
+// Code Splitting (Dynamic Imports for heavy components & modals)
+const PaymentModal = dynamic(() => import("../components/PaymentModal"), { ssr: false });
+const LessonFeeModal = dynamic(() => import("../components/LessonFeeModal"), { ssr: false });
+const ApproveRejectModal = dynamic(() => import("../components/ApproveRejectModal"), { ssr: false });
+const TutorRevenuePanel = dynamic(() => import("../components/TutorRevenuePanel"), { ssr: false });
+const MiniCalendar = dynamic(() => import("../components/MiniCalendar"), { ssr: false });
+const SchedulePlanner = dynamic(() => import("../components/SchedulePlanner"), { ssr: false });
 
 function BookingStatusBadge({
   status,
@@ -89,8 +97,18 @@ function ExpandableMessage({ text }: { text: string }) {
 const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
 
 export default function MyMatchingsPage() {
-  const { role, matchings, bookings, payments, payItem, payAllUnpaid } =
-    useUser();
+  const role = useUserStore((s) => s.role);
+  const { data: matchingsData } = useMatchingsQuery(role === "TUTOR" ? "TUTOR" : "STUDENT");
+  const { data: bookingsData } = useBookingsQuery();
+  const { data: paymentsData } = usePaymentsQuery();
+  const payItemMutation = usePayItemMutation();
+  const payAllMutation = usePayAllMutation();
+
+  const matchings: StudentMatching[] = (matchingsData as StudentMatching[]) ?? [];
+  const bookings = bookingsData ?? [];
+  const payments = paymentsData ?? [];
+  const payItem = (id: number) => payItemMutation.mutate(id);
+  const payAllUnpaid = () => payAllMutation.mutate();
 
   if (role === "GUEST") {
     return (
