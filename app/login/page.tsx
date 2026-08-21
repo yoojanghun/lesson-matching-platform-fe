@@ -6,10 +6,31 @@ import { useRouter } from 'next/navigation';
 import { useUser, MOCK_ACCOUNTS, type TestAccount } from '../components/UserContext';
 import { useMutation } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
+import type { Role } from '../store/useUserStore';
 
 interface LoginRequest {
   username: string,
   password: string
+}
+
+interface LoginResponse {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+}
+
+/** JWT payload를 서명 검증 없이 디코딩 (클라이언트 전용) */
+function decodeJwtPayload(token: string): { sub: string; roles: string[] } | null {
+  try {
+    const payloadBase64 = token.split('.')[1];
+    const decoded = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+    return {
+      sub: decoded.sub ?? '',
+      roles: Array.isArray(decoded.roles) ? decoded.roles : [],
+    };
+  } catch {
+    return null;
+  }
 }
 
 export default function LoginPage() {
@@ -17,15 +38,34 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
-  const { login, quickLogin } = useUser();
+  const { setRole, quickLogin } = useUser();
 
   // 로그인 Mutation 정의
   const loginMutation = useMutation({
     mutationFn: (loginData: LoginRequest) =>
-      apiClient.post('/api/auth/login', loginData),
-    onSuccess: () => {
-      alert("로그인이 완료되었습니다")
-      router.push('/')
+      apiClient.post<LoginResponse>('/api/auth/login', loginData),
+    onSuccess: (response) => {
+      const { accessToken } = response.data;
+
+      // 1. Access Token localStorage 저장
+      localStorage.setItem('tm_token', accessToken);
+
+      // 2. JWT payload 디코딩 → role 추출
+      const payload = decodeJwtPayload(accessToken);
+      if (payload) {
+        // 백엔드 roles: ["ROLE_STUDENT"], ["ROLE_TUTOR"], ["STUDENT"], ["TUTOR"] 등 처리
+        const normalizedRoles = payload.roles.map((r) => String(r).replace(/^ROLE_/, '').toUpperCase());
+        let role: Role = 'GUEST';
+        if (normalizedRoles.includes('TUTOR')) {
+          role = 'TUTOR';
+        } else if (normalizedRoles.includes('STUDENT')) {
+          role = 'STUDENT';
+        }
+
+        setRole(role, payload.sub);
+      }
+
+      router.push('/');
     },
     onError: (error) => {
       console.error('로그인 실패', error);

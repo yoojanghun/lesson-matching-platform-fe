@@ -35,7 +35,7 @@ export interface UserState {
   quickLogin: (account: TestAccount) => void;
   signup: (role: Role, name: string) => void;
   logout: () => void;
-  setRole: (role: Role) => void;
+  setRole: (role: Role, userName?: string) => void;
   addMatching: (tutorId: number, message: string, schedule: string) => void;
   updateMatchingStatus: (id: number, status: 'accepted' | 'rejected') => void;
   addBooking: (booking: Omit<LessonBooking, 'id' | 'requestedAt'>) => void;
@@ -95,12 +95,15 @@ export const useUserStore = create<UserState>()(
       },
 
       logout: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('tm_token');
+        }
         set({ role: 'GUEST', userName: '' });
         get().showToast('로그아웃되었습니다.');
       },
 
-      setRole: (newRole: Role) => {
-        set({ role: newRole });
+      setRole: (newRole: Role, newUserName?: string) => {
+        set({ role: newRole, ...(newUserName !== undefined && { userName: newUserName }) });
       },
 
       addMatching: (tutorId: number, message: string, schedule: string) => {
