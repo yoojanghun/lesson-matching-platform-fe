@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ChevronRight, ChevronDown } from "lucide-react";
 import { CATEGORIES, TUTORS } from "./data/mockData";
+import { useCategoriesQuery } from "./hooks/queries/useCategories";
 import TutorCard from "./components/TutorCard";
 
 const PAGE_SIZE = 4;
@@ -12,8 +14,14 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [tutorPage, setTutorPage] = useState(1);
 
+  const { data: categories, isLoading: isCategoriesLoading } = useCategoriesQuery();
+
   const visibleTutors = TUTORS.slice(0, tutorPage * PAGE_SIZE);
   const hasMore = visibleTutors.length < TUTORS.length;
+
+  useEffect(() => {
+    console.log("Categories data:", categories);
+  }, [categories]);
 
   return (
     <div className="space-y-12">
@@ -71,18 +79,21 @@ export default function HomePage() {
           </button>
         </div>
         <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
-          {CATEGORIES.map(({ icon: Icon, label, count }) => (
-            <button
-              key={label}
-              onClick={() => router.push("/tutors")}
-              className="flex flex-col items-center gap-2 p-3 sm:p-4 border border-border rounded-xl group cursor-pointer" style={{ backgroundColor: '#ffffff' }}
-            >
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-secondary flex items-center justify-center">
-                <Icon size={18} className="text-primary" />
-              </div>
-              <span className="text-xs font-semibold text-foreground">{label}</span>
-              <span className="text-xs text-muted-foreground">{count}명</span>
-            </button>
+          {isCategoriesLoading 
+            ? Array.from({ length: 7 }).map((_, index) => (
+                <div key={index} className="h-24 bg-gray-100 animate-pulse rounded-xl" />
+              )) 
+            : categories?.map(({categoryId, description, icon}) => (
+                <button
+                  key={categoryId}
+                  onClick={() => router.push("/tutors")}
+                  className="flex flex-col items-center gap-2 p-3 sm:p-4 border border-border rounded-xl group cursor-pointer" style={{ backgroundColor: '#ffffff' }}
+                >
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-secondary flex items-center justify-center">
+                    {icon}
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">{description}</span>
+                </button>
           ))}
         </div>
       </section>

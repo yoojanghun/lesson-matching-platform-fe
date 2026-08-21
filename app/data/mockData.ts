@@ -44,13 +44,13 @@ export const TUTOR_LESSON_REQUESTS: TutorLessonRequest[] = [
 ];
 
 export const CATEGORIES = [
-  { icon: Piano, label: "피아노", count: 134 },
-  { icon: Music, label: "바이올린", count: 87 },
-  { icon: Waves, label: "첼로", count: 52 },
-  { icon: Guitar, label: "기타", count: 118 },
-  { icon: Drum, label: "드럼", count: 43 },
-  { icon: Mic2, label: "보컬", count: 96 },
-  { icon: PenLine, label: "작곡", count: 31 },
+  { icon: Piano, label: "피아노" },
+  { icon: Music, label: "바이올린" },
+  { icon: Waves, label: "첼로" },
+  { icon: Guitar, label: "기타" },
+  { icon: Drum, label: "드럼" },
+  { icon: Mic2, label: "보컬" },
+  { icon: PenLine, label: "작곡" },
 ];
 
 export const TUTORS: Tutor[] = [

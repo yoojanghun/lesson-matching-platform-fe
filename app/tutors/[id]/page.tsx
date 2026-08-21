@@ -314,7 +314,7 @@ export default function TutorDetailPage() {
                 <div className="absolute left-0 top-1 bottom-1 w-px bg-border" />
                 {tutor.careers.map((c, i) => (
                   <div key={i} className="relative">
-                    <div className="absolute -left-[17px] top-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-card" />
+                    <div className="absolute -left-4.25 top-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-card" />
                     <p className="text-xs text-muted-foreground mb-0.5">{c.period}</p>
                     <p className="text-sm font-semibold text-foreground">{c.title}</p>
                     <p className="text-xs text-muted-foreground">{c.org}</p>

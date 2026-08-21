@@ -4,29 +4,49 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUser, MOCK_ACCOUNTS, type TestAccount } from '../components/UserContext';
+import { useMutation } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
+
+interface LoginRequest {
+  username: string,
+  password: string
+}
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
   const { login, quickLogin } = useUser();
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!email.trim() || !password) {
+  // 로그인 Mutation 정의
+  const loginMutation = useMutation({
+    mutationFn: (loginData: LoginRequest) =>
+      apiClient.post('/api/auth/login', loginData),
+    onSuccess: () => {
+      alert("로그인이 완료되었습니다")
+      router.push('/')
+    },
+    onError: (error) => {
+      console.error('로그인 실패', error);
+      setError(error instanceof Error ? error.message : '로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
+  });
+
+  // Form 제출 핸들러
+  const handleSubmitLogin = (e: React.SubmitEvent) => {
+    e.preventDefault();
+
+    if (!userId.trim() || !password) {
       setError('이메일과 비밀번호를 모두 입력해 주세요.');
       return;
     }
-
-    const success = login(email, password);
-    if (success) {
-      setError('');
-      router.push('/');
-    } else {
-      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
-    }
-  };
+    
+    loginMutation.mutate({
+      username: userId.trim(),
+      password: password.trim()
+    });
+  }
 
   const handleQuickLogin = (account: TestAccount) => {
     quickLogin(account);
@@ -73,19 +93,19 @@ export default function LoginPage() {
         <div className="flex-1 h-px bg-border" />
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+      <form onSubmit={handleSubmitLogin} className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
         {/* Email */}
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1.5">이메일</label>
           <input
-            type="email"
-            value={email}
+            type="text"
+            value={userId}
             onChange={(e) => {
-              setEmail(e.target.value);
+              setUserId(e.target.value);
               setError('');
             }}
             className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors"
-            placeholder="example@email.com"
+            placeholder="example"
           />
         </div>
 
@@ -117,9 +137,10 @@ export default function LoginPage() {
 
         <button
           type="submit"
+          disabled={loginMutation.isPending}
           className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors cursor-pointer"
         >
-          로그인
+          {loginMutation.isPending ? "로그인 중..." : "로그인"}
         </button>
 
         <div className="flex items-center gap-3">

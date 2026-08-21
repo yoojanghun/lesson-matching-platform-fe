@@ -4,24 +4,70 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BookOpen, GraduationCap } from 'lucide-react';
-import { useUser } from '../components/UserContext';
+import { useMutation } from '@tanstack/react-query';
+import { apiClient } from '../lib/apiClient';
+
+interface SignupData {
+  name: string;
+  userId: string;
+  userPassword: string;
+  email: string;
+}
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { signup } = useUser();
   const [step, setStep] = useState<'choose' | 'form'>('choose');
   const [selectedRole, setSelectedRole] = useState<'STUDENT' | 'TUTOR'>('STUDENT');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
-  const [subject, setSubject] = useState('');
-  const [careerIntro, setCareerIntro] = useState('');
+  const [email, setEmail] = useState('');
 
-  const handleSignUp = (e: React.FormEvent) => {
+  // 학생 회원가입 Mutation 정의
+  const signUpMutationAsStudent = useMutation({
+    mutationFn: (signUpData: SignupData) =>
+      apiClient.post('/api/sign-up/student', signUpData),
+    onSuccess: () => {
+      alert('학생 회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.');
+      router.push('/login');
+    },
+    onError: (error) => {
+      console.error('학생 회원가입 실패:', error);
+      alert('회원가입 중 오류가 발생했습니다. 다시 시도해주세요.');
+    },
+  });
+
+  // 튜터 회원가입 Mutation 정의
+  const signUpMutationAsTutor = useMutation({
+    mutationFn: (signUpData: Record<string, string>) =>
+      apiClient.post('/api/sign-up/tutor', signUpData),
+    onSuccess: () => {
+      alert('튜터 회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.');
+      router.push('/login');
+    },
+    onError: (error) => {
+      console.error('튜터 회원가입 실패:', error);
+      alert('회원가입 중 오류가 발생했습니다. 다시 시도해주세요.');
+    },
+  });
+
+  // Form 제출 핸들러
+  const handleSubmitSignup = (e: React.SubmitEvent) => {
     e.preventDefault();
-    signup(selectedRole, name.trim());
-    router.push('/');
-  };
+
+    const payload = {
+      name: name.trim(),
+      userId: userId.trim(),
+      userPassword: password.trim(),
+      email: email.trim()
+    };
+
+    if (selectedRole === 'STUDENT') {
+      signUpMutationAsStudent.mutate(payload);
+    } else if (selectedRole === 'TUTOR') {
+      signUpMutationAsTutor.mutate(payload);
+    }
+  }
 
   if (step === 'choose') {
     return (
@@ -94,9 +140,9 @@ export default function SignUpPage() {
         <p className="text-sm text-muted-foreground mt-1">기본 정보를 입력해 주세요</p>
       </div>
 
-      <form onSubmit={handleSignUp} className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+      <form onSubmit={handleSubmitSignup} className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
         <div>
-          <label className="block text-xs font-semibold text-foreground mb-1.5">이름</label>
+          <label className="block text-xs font-semibold text-foreground mb-1.5">닉네임</label>
           <input
             required
             value={name}
@@ -107,14 +153,15 @@ export default function SignUpPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-foreground mb-1.5">이메일</label>
+          <label className="block text-xs font-semibold text-foreground mb-1.5">아이디</label>
           <input
-            type="email"
+            type="text"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            minLength={6}
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
             className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors"
-            placeholder="example@email.com"
+            placeholder="6자 이상 입력"
           />
         </div>
 
@@ -131,35 +178,24 @@ export default function SignUpPage() {
           />
         </div>
 
-        {selectedRole === 'TUTOR' && (
-          <>
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">전문 악기 / 과목</label>
-              <input
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors"
-                placeholder="예: 피아노, 기타, 바이올린"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">경력 소개</label>
-              <textarea
-                value={careerIntro}
-                onChange={(e) => setCareerIntro(e.target.value)}
-                rows={3}
-                className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors resize-none"
-                placeholder="학력 및 주요 레슨 경력을 적어주세요"
-              />
-            </div>
-          </>
-        )}
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1.5">이메일</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors"
+            placeholder="example@email.com"
+          />
+        </div>
 
         <button
           type="submit"
+          disabled={signUpMutationAsStudent.isPending || signUpMutationAsTutor.isPending}
           className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors mt-2 cursor-pointer shadow-sm"
         >
-          가입 완료
+          {signUpMutationAsStudent.isPending || signUpMutationAsTutor.isPending ? '가입 중...' : '가입 완료'}
         </button>
       </form>
     </div>

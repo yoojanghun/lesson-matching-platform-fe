@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className="bg-background font-[Inter,'Noto_Sans_KR',sans-serif]">
+      <body suppressHydrationWarning className="bg-background font-[Inter,'Noto_Sans_KR',sans-serif]">
         <QueryProvider>
           <UserProvider>
             <div className="min-h-screen flex flex-col">
