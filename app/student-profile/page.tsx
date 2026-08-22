@@ -13,19 +13,15 @@ import {
 import { useUserStore } from '../store/useUserStore';
 import LoginGate from '../components/LoginGate';
 import type { StudentProfile } from '../types';
+import { useCategoriesQuery } from '../hooks/queries/useCategories';
 
 /* ── 선택지 데이터 ── */
-const INTEREST_OPTIONS = [
-  "피아노", "바이올린", "첼로", "기타", "우쿨렐레",
-  "드럼", "보컬", "작곡", "음악이론", "플루트", "색소폰",
-];
-
 const GOAL_OPTIONS = [
   { label: "취미 / 여가", desc: "즐기기 위해 배우고 싶어요" },
-  { label: "입시 / 수능", desc: "시험 준비가 목적이에요" },
-  { label: "자격증 취득", desc: "공식 자격증을 따고 싶어요" },
-  { label: "전문 연주자", desc: "직업적으로 발전하고 싶어요" },
   { label: "기초 다지기", desc: "기본기를 탄탄히 하고 싶어요" },
+  { label: "입시 / 진학", desc: "시험 준비가 목적이에요" },
+  { label: "자격증 취득", desc: "공식 자격증을 따고 싶어요" },
+  { label: "단기 성취", desc: "좋아하는 곡 하나를 완벽히 연주해내고 싶어요" },
   { label: "창작 / 작곡", desc: "직접 음악을 만들고 싶어요" },
 ];
 
@@ -36,23 +32,24 @@ const STYLE_OPTIONS = [
   "소통·피드백 중심",
   "결과·실력 중심",
   "유머 있고 재미있는 수업",
+  "상관 없음"
 ];
 
 const LESSON_TYPE_OPTIONS = ["대면 수업", "온라인 수업", "둘 다 가능"] as const;
 type LessonType = typeof LESSON_TYPE_OPTIONS[number];
 
 const BUDGET_OPTIONS = [
-  "3만원 이하 / 회",
-  "3~5만원 / 회",
+  "5만원 이하 / 회",
   "5~7만원 / 회",
-  "7만원 이상 / 회",
+  "7~10만원 / 회",
+  "10만원 이상 / 회",
   "상관없음",
 ];
 
 const DAY_OPTIONS = ["월", "화", "수", "목", "금", "토", "일"];
 
 const TIME_OPTIONS = [
-  "오전 (9시~12시)",
+  "오전 (7시~12시)",
   "오후 (12시~17시)",
   "저녁 (17시~21시)",
   "밤 (21시 이후)",
@@ -106,6 +103,8 @@ function SectionCard({
 }
 
 export default function StudentProfilePage() {
+  const { data: categories, isLoading: isCategoriesLoading } = useCategoriesQuery();
+
   const role = useUserStore((state) => state.role);
   const savedProfile = useUserStore((state) => state.studentProfile);
   const saveStudentProfile = useUserStore((state) => state.saveStudentProfile);
@@ -183,12 +182,12 @@ export default function StudentProfilePage() {
       <SectionCard icon={BookOpen} title="관심 분야">
         <p className="text-xs text-muted-foreground -mt-1">배우고 싶은 악기나 분야를 모두 선택하세요.</p>
         <div className="flex flex-wrap gap-2">
-          {INTEREST_OPTIONS.map((o) => (
+          {categories?.map(({ categoryId, description}) => (
             <Chip
-              key={o}
-              label={o}
-              selected={interests.includes(o)}
-              onClick={() => toggle(interests, setInterests, o)}
+              key={categoryId}
+              label={description}
+              selected={interests.includes(description)}
+              onClick={() => toggle(interests, setInterests, description)}
             />
           ))}
         </div>
@@ -281,43 +280,6 @@ export default function StudentProfilePage() {
           onChange={(e) => setLocation(e.target.value)}
           className="w-full px-4 py-3 border border-border rounded-xl text-sm text-foreground bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40"
         />
-      </SectionCard>
-
-      {/* 6. 가능한 시간대 */}
-      <SectionCard icon={Clock} title="레슨 가능 시간대">
-        <p className="text-xs text-muted-foreground -mt-1">수업 가능한 요일과 시간대를 선택하세요.</p>
-        <div>
-          <p className="text-[11px] font-semibold text-muted-foreground mb-2">요일</p>
-          <div className="flex gap-1.5 flex-wrap">
-            {DAY_OPTIONS.map((d) => (
-              <button
-                type="button"
-                key={d}
-                onClick={() => toggle(days, setDays, d)}
-                className={`w-10 h-10 rounded-xl text-sm font-bold border transition-all cursor-pointer ${
-                  days.includes(d)
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-card text-muted-foreground border-border hover:border-primary/40"
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="pt-2">
-          <p className="text-[11px] font-semibold text-muted-foreground mb-2">시간대</p>
-          <div className="flex flex-wrap gap-2">
-            {TIME_OPTIONS.map((t) => (
-              <Chip
-                key={t}
-                label={t}
-                selected={times.includes(t)}
-                onClick={() => toggle(times, setTimes, t)}
-              />
-            ))}
-          </div>
-        </div>
       </SectionCard>
 
       {/* 7. 예산 */}

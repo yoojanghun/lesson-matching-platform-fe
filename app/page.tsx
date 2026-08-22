@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ChevronRight, ChevronDown } from "lucide-react";
-import { CATEGORIES, TUTORS } from "./data/mockData";
+import { TUTORS } from "./data/mockData";
 import { useCategoriesQuery } from "./hooks/queries/useCategories";
 import TutorCard from "./components/TutorCard";
 
@@ -18,10 +18,6 @@ export default function HomePage() {
 
   const visibleTutors = TUTORS.slice(0, tutorPage * PAGE_SIZE);
   const hasMore = visibleTutors.length < TUTORS.length;
-
-  useEffect(() => {
-    console.log("Categories data:", categories);
-  }, [categories]);
 
   return (
     <div className="space-y-12">
@@ -72,7 +68,7 @@ export default function HomePage() {
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-foreground">악기별 탐색</h2>
           <button
-            onClick={() => router.push("/tutors")}
+            onClick={() => router.push("/subjects")}
             className="text-sm text-accent font-medium flex items-center gap-0.5 hover:underline cursor-pointer"
           >
             전체 보기 <ChevronRight size={14} />
@@ -86,7 +82,7 @@ export default function HomePage() {
             : categories?.map(({categoryId, description, icon}) => (
                 <button
                   key={categoryId}
-                  onClick={() => router.push("/tutors")}
+                  onClick={() => router.push(`/subjects?category=${categoryId}`)}
                   className="flex flex-col items-center gap-2 p-3 sm:p-4 border border-border rounded-xl group cursor-pointer" style={{ backgroundColor: '#ffffff' }}
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-secondary flex items-center justify-center">
@@ -100,8 +96,14 @@ export default function HomePage() {
 
       {/* 추천 튜터 */}
       <section>
-        <div className="mb-5">
+        <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">추천 튜터</h2>
+          <button
+            onClick={() => router.push("/tutors")}
+            className="flex items-center gap-0.5 text-sm font-medium text-accent hover:underline cursor-pointer"
+          >
+            전체 보기 <ChevronRight size={14} />
+          </button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

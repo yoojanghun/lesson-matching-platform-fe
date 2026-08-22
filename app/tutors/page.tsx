@@ -1,22 +1,48 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { Search, Loader2 } from "lucide-react";
+import { useState, useMemo, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useTutorsQuery } from "../hooks/queries/useTutors";
+import { useCategoriesQuery } from "../hooks/queries/useCategories";
 import TutorCard from "../components/TutorCard";
 
-const INSTRUMENT_CATS = ["전체", "피아노", "기타", "바이올린", "보컬", "드럼", "첼로", "작곡"];
+const REGIONS = ["전체", "서울", "강남구", "마포구", "성동구", "강동구", "노원구", "용산구"];
 
-export default function TutorsPage() {
+function TutorsContent() {
   const router = useRouter();
-  const [selectedCat, setSelectedCat] = useState("전체");
+  const searchParams = useSearchParams();
+  const urlCategory = searchParams.get("category") || "전체";
+  const urlSubject = searchParams.get("subject") || "";
+  const [selectedCategoryOverride, setSelectedCategoryOverride] = useState<string | null>(null);
+  const [selectedSubjectOverride, setSelectedSubjectOverride] = useState<string | null>(null);
+  const selectedCategory = selectedCategoryOverride ?? urlCategory;
+  const selectedSubject = selectedSubjectOverride ?? urlSubject;
+  const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [modalTab, setModalTab] = useState<"service" | "region">("service");
+  const [selectedRegion, setSelectedRegion] = useState("전체");
+  const [serviceSearch, setServiceSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sort, setSort] = useState("인기순");
+  const { data: categories = [] } = useCategoriesQuery();
+
+  useEffect(() => {
+    if (!serviceModalOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setServiceModalOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [serviceModalOpen]);
+
+  const activeCategory = categories.find((category) => category.description === selectedCategory);
 
   // TanStack Query로 튜터 목록 조회 (5분 자동 캐싱)
   const { data: tutors = [], isLoading, isError } = useTutorsQuery({
-    subject: selectedCat,
+    category: selectedCategory,
+    subject: selectedSubject,
+    region: selectedRegion,
     search: searchQuery,
   });
 
@@ -37,6 +63,33 @@ export default function TutorsPage() {
     }
     return list;
   }, [tutors, sort]);
+
+  const selectCategory = (category: string) => {
+    setSelectedCategoryOverride(category);
+    setSelectedSubjectOverride("");
+  };
+
+  const selectSubject = (subject: string) => {
+    setSelectedSubjectOverride(subject);
+    setSelectedCategoryOverride(activeCategory?.description ?? "전체");
+    setServiceModalOpen(false);
+  };
+
+  const serviceLabel = selectedSubject
+    ? `${selectedCategory} · ${selectedSubject}`
+    : (selectedCategory === "전체" ? "전체" : `${selectedCategory} 전체`);
+  const normalizedServiceSearch = serviceSearch.trim().toLowerCase();
+  const visibleCategories = categories.filter((category) =>
+    category.description.toLowerCase().includes(normalizedServiceSearch) ||
+    category.subjects.some((subject) => subject.description.toLowerCase().includes(normalizedServiceSearch)),
+  );
+  const visibleRegions = REGIONS.filter((region) => region.includes(serviceSearch.trim()));
+
+  const openFilterModal = (tab: "service" | "region") => {
+    setModalTab(tab);
+    setServiceSearch("");
+    setServiceModalOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -67,21 +120,21 @@ export default function TutorsPage() {
           )}
         </div>
 
-        <div className="flex gap-1.5 flex-wrap">
-          {INSTRUMENT_CATS.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCat(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                selectedCat === cat
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-card text-foreground border-border hover:border-primary/40"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          onClick={() => openFilterModal("service")}
+          className="flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs text-foreground shadow-sm transition-colors hover:border-primary/40"
+        >
+          {serviceLabel === "전체" ? "서비스" : serviceLabel} <ChevronDown size={15} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => openFilterModal("region")}
+          className="flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs text-foreground shadow-sm transition-colors hover:border-primary/40"
+        >
+          {selectedRegion === "전체" ? "지역" : selectedRegion} <ChevronDown size={15} />
+        </button>
 
         <select
           value={sort}
@@ -136,6 +189,146 @@ export default function TutorsPage() {
           ))}
         </div>
       )}
+
+      {serviceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="서비스 선택창 닫기"
+            onClick={() => setServiceModalOpen(false)}
+            className="absolute inset-0 cursor-default bg-foreground/50 backdrop-blur-[1px]"
+          />
+          <div className="relative flex max-h-[min(680px,calc(100vh-32px))] w-full max-w-md flex-col overflow-hidden rounded-xl bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div className="flex items-center gap-6">
+                <button
+                  type="button"
+                  onClick={() => openFilterModal("service")}
+                  className={`border-b-2 pb-3.5 -mb-4 text-sm ${modalTab === "service" ? "border-accent font-semibold text-accent" : "border-transparent text-muted-foreground"}`}
+                >
+                  서비스
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openFilterModal("region")}
+                  className={`border-b-2 pb-3.5 -mb-4 text-sm ${modalTab === "region" ? "border-accent font-semibold text-accent" : "border-transparent text-muted-foreground"}`}
+                >
+                  지역
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setServiceModalOpen(false)}
+                aria-label="닫기"
+                className="rounded-lg p-1 text-foreground transition-colors hover:bg-muted"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-4 pb-3">
+              <div className="my-4 flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2.5">
+                <Search size={16} className="text-muted-foreground" />
+                <input
+                  value={serviceSearch}
+                  onChange={(event) => setServiceSearch(event.target.value)}
+                  className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  placeholder={modalTab === "service" ? "어떤 분야의 고수를 찾으세요?" : "어느 지역의 고수를 찾으세요?"}
+                  aria-label={modalTab === "service" ? "서비스 검색" : "지역 검색"}
+                />
+              </div>
+
+              {modalTab === "service" ? <>
+                <button
+                type="button"
+                onClick={() => { selectCategory("전체"); setServiceModalOpen(false); }}
+                className={`flex w-full items-center justify-between border-b border-border px-1 py-3 text-left text-sm ${
+                  serviceLabel === "전체" ? "font-semibold text-accent" : "text-foreground"
+                }`}
+              >
+                서비스 전체
+                {serviceLabel === "전체" && <Check size={18} />}
+                </button>
+
+                {visibleCategories.map((category) => {
+                  const isOpen = selectedCategory === category.description;
+                  const isSelectedCategory = selectedCategory === category.description;
+
+                return (
+                  <div key={category.categoryId} className="border-b border-border">
+                    <button
+                      type="button"
+                      onClick={() => selectCategory(category.description)}
+                      className={`flex w-full items-center justify-between px-1 py-3 text-left text-sm ${
+                        isSelectedCategory ? "font-semibold text-accent" : "text-foreground"
+                      }`}
+                    >
+                      {category.description}
+                      <ChevronDown size={16} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {isOpen && (
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-3 pl-3">
+                        <button
+                          type="button"
+                          onClick={() => { selectCategory(category.description); setServiceModalOpen(false); }}
+                          className={`rounded-md px-2 py-2 text-left text-xs transition-colors hover:bg-muted ${
+                            isSelectedCategory && !selectedSubject ? "font-semibold text-accent" : "text-muted-foreground"
+                          }`}
+                        >
+                          {category.description} 전체
+                        </button>
+                        {category.subjects
+                          .filter((subject) =>
+                            !normalizedServiceSearch ||
+                            category.description.toLowerCase().includes(normalizedServiceSearch) ||
+                            subject.description.toLowerCase().includes(normalizedServiceSearch),
+                          )
+                          .map((subject) => (
+                          <button
+                            key={subject.subjectId}
+                            type="button"
+                            onClick={() => selectSubject(subject.description)}
+                            className={`rounded-md px-2 py-2 text-left text-xs transition-colors hover:bg-muted ${
+                              selectedSubject === subject.description
+                                ? "font-semibold text-accent"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {subject.description}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+                })}
+              </> : (
+                <div>
+                  {visibleRegions.map((region) => (
+                    <button
+                      key={region}
+                      type="button"
+                      onClick={() => { setSelectedRegion(region); setServiceModalOpen(false); }}
+                      className={`flex w-full items-center justify-between border-b border-border px-1 py-3 text-left text-sm ${selectedRegion === region ? "font-semibold text-accent" : "text-foreground"}`}
+                    >
+                      {region === "전체" ? "지역 전체" : region}
+                      {selectedRegion === region && <Check size={18} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function TutorsPage() {
+  return (
+    <Suspense fallback={<div className="h-72 animate-pulse rounded-xl bg-muted" />}>
+      <TutorsContent />
+    </Suspense>
   );
 }

@@ -6,14 +6,27 @@ import { TUTORS } from '../../data/mockData';
 import type { Tutor } from '../../types';
 
 // 튜터 목록 조회 훅 (5분 캐시)
-export function useTutorsQuery(filters?: { subject?: string; search?: string }) {
+export function useTutorsQuery(filters?: { category?: string; subject?: string; region?: string; search?: string }) {
   return useQuery({
     queryKey: queryKeys.tutors.list(filters),
     queryFn: async (): Promise<Tutor[]> => {
       // API 연동 시: const res = await fetch(`/api/v1/tutors?...`); return res.json();
       let list = [...TUTORS];
+      if (filters?.category && filters.category !== '전체') {
+        const categoryQuery = filters.category.toLowerCase();
+        list = list.filter((t) => t.subject.toLowerCase().includes(categoryQuery));
+      }
       if (filters?.subject && filters.subject !== '전체') {
-        list = list.filter((t) => t.subject === filters.subject);
+        const subjectQuery = filters.subject.toLowerCase();
+        list = list.filter(
+          (t) =>
+            t.subject.toLowerCase().includes(subjectQuery) ||
+            t.tags.some((tag) => tag.toLowerCase().includes(subjectQuery))
+        );
+      }
+      if (filters?.region && filters.region !== '전체') {
+        const regionQuery = filters.region.toLowerCase();
+        list = list.filter((t) => t.location?.toLowerCase().includes(regionQuery));
       }
       if (filters?.search) {
         const q = filters.search.toLowerCase();
