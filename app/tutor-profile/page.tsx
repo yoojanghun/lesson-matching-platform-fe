@@ -18,6 +18,8 @@ import {
 import { useUserStore } from '../store/useUserStore';
 import LoginGate from '../components/LoginGate';
 import type { TutorProfileData, BulletEntry, FeeEntry } from '../types';
+import { useCategoriesQuery } from '../hooks/queries/useCategories';
+import { useSaveTutorProfileMutation, useTutorProfileQuery } from '../hooks/queries/useProfiles';
 
 /* ── 선택지 ── */
 const TEACH_STYLE_OPTIONS = [
@@ -101,10 +103,13 @@ let _id = 100;
 const uid = () => ++_id;
 
 export default function TutorProfilePage() {
+  const { data: categories } = useCategoriesQuery();
   const role = useUserStore((state) => state.role);
   const userName = useUserStore((state) => state.userName);
   const savedProfile = useUserStore((state) => state.tutorProfile);
   const saveTutorProfile = useUserStore((state) => state.saveTutorProfile);
+  const profileQuery = useTutorProfileQuery(role === 'TUTOR');
+  const saveProfileMutation = useSaveTutorProfileMutation();
 
   /* 기본 정보 */
   const [name, setName] = useState(userName || "");
@@ -164,6 +169,23 @@ export default function TutorProfilePage() {
     }
   }, [savedProfile]);
 
+  useEffect(() => {
+    const profile = profileQuery.data;
+    if (!profile) return;
+
+    setName(profile.name || userName || '');
+    setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
+    setSubjects(profile.categories.map((category) =>
+      categories?.find((item) => item.categoryName === category.categoryType)?.description ?? category.categoryType ?? ''
+    ).filter(Boolean));
+    setTeachStyles(profile.styles.map((style) =>
+      TEACH_STYLE_OPTIONS.find((label) => label === style.description) ?? ''
+    ).filter(Boolean));
+    setTeachNote(profile.content ?? '');
+    setIntro(profile.introduction ?? '');
+    setCareers(profile.career ? profile.career.split('\n').map((text, index) => ({ id: index + 1, text })) : [{ id: uid(), text: '' }]);
+  }, [categories, profileQuery.data, userName]);
+
   if (role === 'GUEST') {
     return (
       <LoginGate
@@ -206,9 +228,22 @@ export default function TutorProfilePage() {
       lessonType,
       intro,
     };
-    saveTutorProfile(profileData);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    const existingProfile = profileQuery.data;
+    saveProfileMutation.mutate({
+      categoryIds: categories?.filter((category) => subjects.includes(category.description)).map((category) => category.categoryId),
+      subjectIds: categories?.filter((category) => subjects.includes(category.description)).flatMap((category) => category.subjects.map((subject) => subject.subjectId)),
+      styleIds: existingProfile?.styles.filter((style) => teachStyles.includes(style.description ?? '')).map((style) => style.id).filter((id): id is number => id !== undefined),
+      locationIds: existingProfile?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
+      career: careers.filter((career) => career.text.trim()).map((career) => career.text.trim()).join('\n'),
+      content: teachNote,
+      introduction: intro,
+    }, {
+      onSuccess: () => {
+        saveTutorProfile(profileData);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      },
+    });
   };
 
   return (
@@ -476,7 +511,9 @@ export default function TutorProfilePage() {
             : "bg-primary text-primary-foreground hover:bg-primary/90"
         }`}
       >
-        {saved ? (
+        {saveProfileMutation.isPending ? (
+          "저장 중..."
+        ) : saved ? (
           <span className="flex items-center justify-center gap-2">
             <CheckCircle2 size={16} /> 프로필 저장 완료!
           </span>

@@ -47,4 +47,10 @@ export const queryKeys = {
     all: ['categories'] as const,
     subjects: (categoryId?: number) => [...queryKeys.categories.all, 'subjects', categoryId] as const,
   },
+
+  profiles: {
+    all: ['profiles'] as const,
+    student: ['profiles', 'student', 'me'] as const,
+    tutor: ['profiles', 'tutor', 'me'] as const,
+  },
 };

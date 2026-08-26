@@ -164,7 +164,6 @@ export interface StudentProfile {
   interests: string[];
   goals: string[];
   styles: string[];
-  styleNote: string;
   lessonType: "대면 수업" | "온라인 수업" | "둘 다 가능" | "";
   location: string;
   budget: string;

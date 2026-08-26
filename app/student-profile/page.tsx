@@ -14,6 +14,7 @@ import { useUserStore } from '../store/useUserStore';
 import LoginGate from '../components/LoginGate';
 import type { StudentProfile } from '../types';
 import { useCategoriesQuery } from '../hooks/queries/useCategories';
+import { useSaveStudentProfileMutation, useStudentProfileQuery } from '../hooks/queries/useProfiles';
 
 /* ── 선택지 데이터 ── */
 const GOAL_OPTIONS = [
@@ -31,6 +32,7 @@ const STYLE_OPTIONS = [
   "자유롭고 창의적인 선생님",
   "소통·피드백 중심",
   "결과·실력 중심",
+  "이론·원리 설명 중심",
   "유머 있고 재미있는 수업",
   "상관 없음"
 ];
@@ -54,6 +56,40 @@ const TIME_OPTIONS = [
   "저녁 (17시~21시)",
   "밤 (21시 이후)",
 ];
+
+const GOAL_API_VALUES: Record<string, string> = {
+  "취미 / 여가": "HOBBY",
+  "기초 다지기": "BASIC",
+  "입시 / 진학": "EXAM",
+  "자격증 취득": "CERTIFICATE",
+  "단기 성취": "SHORT_TERM",
+  "창작 / 작곡": "CREATION",
+};
+
+const STYLE_API_VALUES: Record<string, string> = {
+  "친절하고 따뜻한 선생님": "KIND_AND_WARM",
+  "체계적이고 엄격한 선생님": "STRUCTURED_AND_STRICT",
+  "자유롭고 창의적인 선생님": "FREE_AND_CREATIVE",
+  "소통·피드백 중심": "COMMUNICATION_AND_FEEDBACK",
+  "결과·실력 중심": "RESULT_AND_SKILL",
+  "이론·원리 설명 중심": "THEORY_AND_PRINCIPLE",
+  "유머 있고 재미있는 수업": "HUMOROUS_AND_FUN",
+  "상관 없음": "ANY",
+};
+
+const LESSON_TYPE_API_VALUES: Record<string, string> = {
+  "대면 수업": "OFFLINE",
+  "온라인 수업": "ONLINE",
+  "둘 다 가능": "BOTH",
+};
+
+const BUDGET_API_VALUES: Record<string, string> = {
+  "5만원 이하 / 회": "UNDER_50K",
+  "5~7만원 / 회": "BETWEEN_50K_70K",
+  "7~10만원 / 회": "BETWEEN_70K_100K",
+  "10만원 이상 / 회": "OVER_100K",
+  "상관없음": "NEGOTIABLE",
+};
 
 /* ── UI Components ── */
 function Chip({
@@ -108,12 +144,13 @@ export default function StudentProfilePage() {
   const role = useUserStore((state) => state.role);
   const savedProfile = useUserStore((state) => state.studentProfile);
   const saveStudentProfile = useUserStore((state) => state.saveStudentProfile);
+  const profileQuery = useStudentProfileQuery(role === 'STUDENT');
+  const saveProfileMutation = useSaveStudentProfileMutation();
 
   /* 상태 */
   const [interests, setInterests] = useState<string[]>([]);
   const [goals, setGoals] = useState<string[]>([]);
   const [styles, setStyles] = useState<string[]>([]);
-  const [styleNote, setStyleNote] = useState("");
   const [lessonType, setLessonType] = useState<LessonType | "">("");
   const [location, setLocation] = useState("");
   const [budget, setBudget] = useState("");
@@ -128,7 +165,6 @@ export default function StudentProfilePage() {
       setInterests(savedProfile.interests || []);
       setGoals(savedProfile.goals || []);
       setStyles(savedProfile.styles || []);
-      setStyleNote(savedProfile.styleNote || "");
       setLessonType(savedProfile.lessonType || "");
       setLocation(savedProfile.location || "");
       setBudget(savedProfile.budget || "");
@@ -137,6 +173,19 @@ export default function StudentProfilePage() {
       setMemo(savedProfile.memo || "");
     }
   }, [savedProfile]);
+
+  useEffect(() => {
+    const profile = profileQuery.data;
+    if (!profile) return;
+
+    setInterests(profile.instruments.map((instrument) => instrument.categoryType ?? '').filter(Boolean));
+    setGoals(profile.goals.map((goal) => GOAL_OPTIONS.find(({ label }) => GOAL_API_VALUES[label] === goal.lessonGoalType)?.label ?? '').filter(Boolean));
+    setStyles(profile.styles.map((style) => STYLE_OPTIONS.find((label) => STYLE_API_VALUES[label] === style.styleType) ?? '').filter(Boolean));
+    setLessonType(Object.entries(LESSON_TYPE_API_VALUES).find(([, value]) => value === profile.lessonType)?.[0] as LessonType | undefined ?? '');
+    setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
+    setBudget(Object.entries(BUDGET_API_VALUES).find(([, value]) => value === profile.budgetType)?.[0] ?? '');
+    setMemo(profile.introduction ?? '');
+  }, [profileQuery.data]);
 
   if (role === 'GUEST') {
     return (
@@ -155,7 +204,6 @@ export default function StudentProfilePage() {
       interests,
       goals,
       styles,
-      styleNote,
       lessonType,
       location,
       budget,
@@ -163,9 +211,22 @@ export default function StudentProfilePage() {
       times,
       memo,
     };
-    saveStudentProfile(profileData);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    const existingProfile = profileQuery.data;
+    saveProfileMutation.mutate({
+      categoryIds: categories?.filter((category) => interests.includes(category.description)).map((category) => category.categoryId),
+      styleIds: existingProfile?.styles.filter((style) => styles.some((label) => STYLE_API_VALUES[label] === style.styleType)).map((style) => style.id).filter((id): id is number => id !== undefined),
+      goalIds: existingProfile?.goals.filter((goal) => goals.some((label) => GOAL_API_VALUES[label] === goal.lessonGoalType)).map((goal) => goal.goalId).filter((id): id is number => id !== undefined),
+      locationIds: existingProfile?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
+      introduction: memo,
+      lessonType: lessonType ? LESSON_TYPE_API_VALUES[lessonType] : undefined,
+      budgetType: budget ? BUDGET_API_VALUES[budget] : undefined,
+    }, {
+      onSuccess: () => {
+        saveStudentProfile(profileData);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      },
+    });
   };
 
   return (
@@ -237,16 +298,6 @@ export default function StudentProfilePage() {
               onClick={() => toggle(styles, setStyles, o)}
             />
           ))}
-        </div>
-        <div className="space-y-1.5 pt-1">
-          <label className="text-[11px] font-semibold text-muted-foreground">기타 선호 스타일 (직접 입력)</label>
-          <textarea
-            rows={2}
-            placeholder="위 항목에 없는 세부 선호 사항을 자유롭게 적어주세요. (AI 추천 시 반영됩니다)"
-            value={styleNote}
-            onChange={(e) => setStyleNote(e.target.value)}
-            className="w-full px-4 py-3 border border-border rounded-xl text-sm text-foreground bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 resize-none leading-relaxed"
-          />
         </div>
       </SectionCard>
 
@@ -325,7 +376,9 @@ export default function StudentProfilePage() {
             : "bg-primary text-primary-foreground hover:bg-primary/90"
         }`}
       >
-        {saved ? (
+        {saveProfileMutation.isPending ? (
+          "저장 중..."
+        ) : saved ? (
           <span className="flex items-center justify-center gap-2">
             <CheckCircle2 size={16} /> 프로필 저장 완료!
           </span>
