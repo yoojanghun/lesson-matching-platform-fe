@@ -20,6 +20,7 @@ import LoginGate from '../components/LoginGate';
 import type { TutorProfileData, BulletEntry, FeeEntry } from '../types';
 import { useCategoriesQuery } from '../hooks/queries/useCategories';
 import { useSaveTutorProfileMutation, useTutorProfileQuery } from '../hooks/queries/useProfiles';
+import { useReferencesQuery } from '../hooks/queries/useReferences';
 
 /* ── 선택지 ── */
 const TEACH_STYLE_OPTIONS = [
@@ -103,8 +104,9 @@ let _id = 100;
 const uid = () => ++_id;
 
 export default function TutorProfilePage() {
-  const { data: categories } = useCategoriesQuery();
   const role = useUserStore((state) => state.role);
+  const { data: categories } = useCategoriesQuery();
+  const { data: references } = useReferencesQuery(role !== 'GUEST');
   const userName = useUserStore((state) => state.userName);
   const savedProfile = useUserStore((state) => state.tutorProfile);
   const saveTutorProfile = useUserStore((state) => state.saveTutorProfile);
@@ -178,13 +180,11 @@ export default function TutorProfilePage() {
     setSubjects(profile.categories.map((category) =>
       categories?.find((item) => item.categoryName === category.categoryType)?.description ?? category.categoryType ?? ''
     ).filter(Boolean));
-    setTeachStyles(profile.styles.map((style) =>
-      TEACH_STYLE_OPTIONS.find((label) => label === style.description) ?? ''
-    ).filter(Boolean));
+    setTeachStyles(profile.styles.map((style) => style.description ?? '').filter(Boolean));
     setTeachNote(profile.content ?? '');
     setIntro(profile.introduction ?? '');
     setCareers(profile.career ? profile.career.split('\n').map((text, index) => ({ id: index + 1, text })) : [{ id: uid(), text: '' }]);
-  }, [categories, profileQuery.data, userName]);
+  }, [categories, profileQuery.data, references, userName]);
 
   if (role === 'GUEST') {
     return (
@@ -228,12 +228,11 @@ export default function TutorProfilePage() {
       lessonType,
       intro,
     };
-    const existingProfile = profileQuery.data;
     saveProfileMutation.mutate({
       categoryIds: categories?.filter((category) => subjects.includes(category.description)).map((category) => category.categoryId),
       subjectIds: categories?.filter((category) => subjects.includes(category.description)).flatMap((category) => category.subjects.map((subject) => subject.subjectId)),
-      styleIds: existingProfile?.styles.filter((style) => teachStyles.includes(style.description ?? '')).map((style) => style.id).filter((id): id is number => id !== undefined),
-      locationIds: existingProfile?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
+      styleIds: references?.tutorStyles.filter((style) => teachStyles.includes(style.description)).map((style) => style.id),
+      locationIds: references?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
       career: careers.filter((career) => career.text.trim()).map((career) => career.text.trim()).join('\n'),
       content: teachNote,
       introduction: intro,
@@ -437,7 +436,10 @@ export default function TutorProfilePage() {
       <SectionCard icon={BookOpen} title="수업 방식 및 스타일">
         <p className="text-xs text-muted-foreground -mt-1">선생님의 수업 스타일과 가장 잘 맞는 항목을 선택하세요.</p>
         <div className="flex flex-wrap gap-2">
-          {TEACH_STYLE_OPTIONS.map((o) => (
+          {(references?.tutorStyles.length
+            ? references.tutorStyles.map((style) => style.description)
+            : TEACH_STYLE_OPTIONS
+          ).map((o) => (
             <Chip
               key={o}
               label={o}
@@ -478,13 +480,27 @@ export default function TutorProfilePage() {
         </div>
         {(lessonType === "대면 수업" || lessonType === "둘 다 가능") && (
           <InputRow label="대면 수업 가능 지역">
-            <input
-              type="text"
-              placeholder="예) 서울 마포구, 서초구, 경기 성남시..."
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className={INPUT_BASE}
-            />
+            <div className="flex flex-wrap gap-2">
+              {(references?.locations ?? []).map((locationOption) => (
+                <button
+                  key={locationOption.locationId}
+                  type="button"
+                  onClick={() => setLocation((current) => {
+                    const selected = current.split(',').map((item) => item.trim()).filter(Boolean);
+                    return selected.includes(locationOption.name)
+                      ? selected.filter((item) => item !== locationOption.name).join(', ')
+                      : [...selected, locationOption.name].join(', ');
+                  })}
+                  className={`px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all cursor-pointer ${
+                    location.split(',').map((item) => item.trim()).includes(locationOption.name)
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : 'bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
+                  }`}
+                >
+                  {locationOption.name}
+                </button>
+              ))}
+            </div>
           </InputRow>
         )}
       </SectionCard>

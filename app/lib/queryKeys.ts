@@ -53,4 +53,9 @@ export const queryKeys = {
     student: ['profiles', 'student', 'me'] as const,
     tutor: ['profiles', 'tutor', 'me'] as const,
   },
+
+  references: {
+    all: ['references', 'all'] as const,
+    locations: ['references', 'locations'] as const,
+  },
 };

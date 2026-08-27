@@ -15,6 +15,7 @@ import LoginGate from '../components/LoginGate';
 import type { StudentProfile } from '../types';
 import { useCategoriesQuery } from '../hooks/queries/useCategories';
 import { useSaveStudentProfileMutation, useStudentProfileQuery } from '../hooks/queries/useProfiles';
+import { useReferencesQuery } from '../hooks/queries/useReferences';
 
 /* ── 선택지 데이터 ── */
 const GOAL_OPTIONS = [
@@ -139,9 +140,9 @@ function SectionCard({
 }
 
 export default function StudentProfilePage() {
-  const { data: categories, isLoading: isCategoriesLoading } = useCategoriesQuery();
-
   const role = useUserStore((state) => state.role);
+  const { data: categories, isLoading: isCategoriesLoading } = useCategoriesQuery();
+  const { data: references } = useReferencesQuery(role !== 'GUEST');
   const savedProfile = useUserStore((state) => state.studentProfile);
   const saveStudentProfile = useUserStore((state) => state.saveStudentProfile);
   const profileQuery = useStudentProfileQuery(role === 'STUDENT');
@@ -178,14 +179,22 @@ export default function StudentProfilePage() {
     const profile = profileQuery.data;
     if (!profile) return;
 
-    setInterests(profile.instruments.map((instrument) => instrument.categoryType ?? '').filter(Boolean));
-    setGoals(profile.goals.map((goal) => GOAL_OPTIONS.find(({ label }) => GOAL_API_VALUES[label] === goal.lessonGoalType)?.label ?? '').filter(Boolean));
-    setStyles(profile.styles.map((style) => STYLE_OPTIONS.find((label) => STYLE_API_VALUES[label] === style.styleType) ?? '').filter(Boolean));
+    setInterests(profile.instruments.map((instrument) =>
+      categories?.find((category) => category.categoryName === instrument.categoryType)?.description ?? instrument.categoryType ?? ''
+    ).filter(Boolean));
+    setGoals(profile.goals.map((goal) =>
+      references?.lessonGoals.find((referenceGoal) => referenceGoal.lessonGoalType === goal.lessonGoalType)?.description ??
+      GOAL_OPTIONS.find(({ label }) => GOAL_API_VALUES[label] === goal.lessonGoalType)?.label ?? ''
+    ).filter(Boolean));
+    setStyles(profile.styles.map((style) =>
+      references?.tutorStyles.find((referenceStyle) => referenceStyle.styleType === style.styleType)?.description ??
+      STYLE_OPTIONS.find((label) => STYLE_API_VALUES[label] === style.styleType) ?? ''
+    ).filter(Boolean));
     setLessonType(Object.entries(LESSON_TYPE_API_VALUES).find(([, value]) => value === profile.lessonType)?.[0] as LessonType | undefined ?? '');
     setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
     setBudget(Object.entries(BUDGET_API_VALUES).find(([, value]) => value === profile.budgetType)?.[0] ?? '');
     setMemo(profile.introduction ?? '');
-  }, [profileQuery.data]);
+  }, [categories, profileQuery.data, references]);
 
   if (role === 'GUEST') {
     return (
@@ -211,12 +220,11 @@ export default function StudentProfilePage() {
       times,
       memo,
     };
-    const existingProfile = profileQuery.data;
     saveProfileMutation.mutate({
       categoryIds: categories?.filter((category) => interests.includes(category.description)).map((category) => category.categoryId),
-      styleIds: existingProfile?.styles.filter((style) => styles.some((label) => STYLE_API_VALUES[label] === style.styleType)).map((style) => style.id).filter((id): id is number => id !== undefined),
-      goalIds: existingProfile?.goals.filter((goal) => goals.some((label) => GOAL_API_VALUES[label] === goal.lessonGoalType)).map((goal) => goal.goalId).filter((id): id is number => id !== undefined),
-      locationIds: existingProfile?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
+      styleIds: references?.tutorStyles.filter((style) => styles.includes(style.description)).map((style) => style.id),
+      goalIds: references?.lessonGoals.filter((goal) => goals.includes(goal.description ?? GOAL_OPTIONS.find((option) => GOAL_API_VALUES[option.label] === goal.lessonGoalType)?.label ?? '')).map((goal) => goal.goalId),
+      locationIds: references?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
       introduction: memo,
       lessonType: lessonType ? LESSON_TYPE_API_VALUES[lessonType] : undefined,
       budgetType: budget ? BUDGET_API_VALUES[budget] : undefined,
@@ -258,7 +266,13 @@ export default function StudentProfilePage() {
       <SectionCard icon={SlidersHorizontal} title="레슨 목표">
         <p className="text-xs text-muted-foreground -mt-1">레슨을 받으려는 목적을 선택하세요. (복수 선택 가능)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {GOAL_OPTIONS.map(({ label, desc }) => {
+          {(references?.lessonGoals.length
+            ? references.lessonGoals.map((goal) => ({
+              label: goal.description ?? GOAL_OPTIONS.find((option) => GOAL_API_VALUES[option.label] === goal.lessonGoalType)?.label ?? goal.lessonGoalType,
+              desc: GOAL_OPTIONS.find((option) => GOAL_API_VALUES[option.label] === goal.lessonGoalType)?.desc ?? '',
+            }))
+            : GOAL_OPTIONS
+          ).map(({ label, desc }) => {
             const sel = goals.includes(label);
             return (
               <button
@@ -290,7 +304,10 @@ export default function StudentProfilePage() {
       <SectionCard icon={User} title="선호하는 선생님 스타일 (AI 추천용)">
         <p className="text-xs text-muted-foreground -mt-1">어떤 스타일의 선생님과 수업하고 싶으신가요?</p>
         <div className="flex flex-wrap gap-2">
-          {STYLE_OPTIONS.map((o) => (
+          {(references?.tutorStyles.length
+            ? references.tutorStyles.map((style) => style.description)
+            : STYLE_OPTIONS
+          ).map((o) => (
             <Chip
               key={o}
               label={o}
@@ -324,13 +341,21 @@ export default function StudentProfilePage() {
       {/* 5. 레슨 가능 지역 */}
       <SectionCard icon={MapPin} title="레슨 가능 지역">
         <p className="text-xs text-muted-foreground -mt-1">대면 수업이 가능한 지역을 알려주세요.</p>
-        <input
-          type="text"
-          placeholder="예) 서울 강남구, 경기 성남시 분당구..."
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          className="w-full px-4 py-3 border border-border rounded-xl text-sm text-foreground bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40"
-        />
+        <div className="flex flex-wrap gap-2">
+          {(references?.locations ?? []).map((locationOption) => (
+            <Chip
+              key={locationOption.locationId}
+              label={locationOption.name}
+              selected={location.split(',').map((item) => item.trim()).includes(locationOption.name)}
+              onClick={() => setLocation((current) => {
+                const selected = current.split(',').map((item) => item.trim()).filter(Boolean);
+                return selected.includes(locationOption.name)
+                  ? selected.filter((item) => item !== locationOption.name).join(', ')
+                  : [...selected, locationOption.name].join(', ');
+              })}
+            />
+          ))}
+        </div>
       </SectionCard>
 
       {/* 7. 예산 */}
