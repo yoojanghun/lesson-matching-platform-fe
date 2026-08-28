@@ -3,7 +3,16 @@ import type { Tutor } from "../types";
 import Image from "next/image";
 import StarRow from "./StarRow";
 
+const DISPLAYABLE_LESSON_GOALS = [
+  { label: "취미", values: ["취미", "취미 / 여가", "HOBBY"] },
+  { label: "입시", values: ["입시", "입시 / 진학", "EXAM"] },
+];
+
 export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: () => void }) {
+  const lessonGoals = DISPLAYABLE_LESSON_GOALS
+    .filter(({ values }) => tutor.lessonGoals?.some((goal) => values.includes(goal)))
+    .map(({ label }) => label);
+
   return (
     <div
       onClick={onClick}
@@ -26,7 +35,9 @@ export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: (
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="font-semibold text-foreground text-sm">{tutor.name}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{tutor.subject}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {lessonGoals.length ? lessonGoals.join(" · ") : tutor.subject}
+              </p>
             </div>
             <div className="text-right shrink-0">
               <p className="text-sm font-bold text-primary">{tutor.price.toLocaleString()}원</p>

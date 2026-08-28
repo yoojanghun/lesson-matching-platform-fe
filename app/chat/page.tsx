@@ -81,9 +81,15 @@ const AUTO_REPLIES = [
 ];
 
 let nextId = 100;
+let nextConversationId = 1000;
+
 function nowTime() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function createConversationId() {
+  return nextConversationId++;
 }
 
 function lastMsg(conv: Conversation) {
@@ -112,7 +118,7 @@ function ChatListContent() {
         const tutor = TUTORS.find((t) => t.id === targetTutorId);
         if (tutor) {
           const newConv: Conversation = {
-            id: Date.now(),
+            id: createConversationId(),
             tutorId: tutor.id,
             tutorName: tutor.name,
             tutorAvatar: tutor.avatar,

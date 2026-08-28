@@ -7,6 +7,7 @@ import {
   Briefcase,
   Wallet,
   BookOpen,
+  SlidersHorizontal,
   MapPin,
   Clock,
   Plus,
@@ -23,6 +24,15 @@ import { useSaveTutorProfileMutation, useTutorProfileQuery } from '../hooks/quer
 import { useReferencesQuery } from '../hooks/queries/useReferences';
 
 /* ── 선택지 ── */
+const GOAL_OPTIONS = [
+  { label: "취미 / 여가", desc: "즐기기 위해 배우고 싶어요" },
+  { label: "콩쿠르 준비", desc: "콩쿠르를 준비 중이에요" },
+  { label: "입시 / 진학", desc: "시험 준비가 목적이에요" },
+  { label: "자격증 취득", desc: "공식 자격증을 따고 싶어요" },
+  { label: "단기 성취", desc: "좋아하는 곡 하나를 완벽히 연주해내고 싶어요" },
+  { label: "창작 / 작곡", desc: "직접 음악을 만들고 싶어요" },
+];
+
 const TEACH_STYLE_OPTIONS = [
   "악보 중심 수업",
   "청음·귀 훈련 중심",
@@ -118,6 +128,7 @@ export default function TutorProfilePage() {
   const [age, setAge] = useState("");
   const [location, setLocation] = useState("");
   const [subjects, setSubjects] = useState<string[]>(["피아노"]);
+  const [goals, setGoals] = useState<string[]>([]);
 
   /* 학력 */
   const [educations, setEducations] = useState<BulletEntry[]>([
@@ -155,6 +166,7 @@ export default function TutorProfilePage() {
       setAge(savedProfile.age || "");
       setLocation(savedProfile.location || "");
       setSubjects(savedProfile.subjects || []);
+      setGoals(savedProfile.goals || []);
       if (savedProfile.educations && savedProfile.educations.length > 0) {
         setEducations(savedProfile.educations);
       }
@@ -162,7 +174,7 @@ export default function TutorProfilePage() {
         setCareers(savedProfile.careers);
       }
       if (savedProfile.fees && savedProfile.fees.length > 0) {
-        setFees(savedProfile.fees);
+        setFees(savedProfile.fees.slice(0, 3));
       }
       setTeachStyles(savedProfile.teachStyles || []);
       setTeachNote(savedProfile.teachNote || "");
@@ -208,7 +220,7 @@ export default function TutorProfilePage() {
 
   /* 레슨비 helpers */
   const addFee = () =>
-    setFees((p) => [...p, { id: uid(), type: "", duration: "60분", price: "" }]);
+    setFees((p) => p.length < 3 ? [...p, { id: uid(), type: "", duration: "60분", price: "" }] : p);
   const removeFee = (id: number) =>
     setFees((p) => p.filter((f) => f.id !== id));
   const updateFee = (id: number, field: keyof FeeEntry, val: string) =>
@@ -220,6 +232,7 @@ export default function TutorProfilePage() {
       age,
       location,
       subjects,
+      goals,
       educations: educations.filter((e) => e.text.trim() !== ""),
       careers: careers.filter((c) => c.text.trim() !== ""),
       fees: fees.filter((f) => f.type.trim() !== "" && f.price.trim() !== ""),
@@ -300,7 +313,39 @@ export default function TutorProfilePage() {
         </InputRow>
       </SectionCard>
 
-      {/* 2. 학력 */}
+      {/* 2. 레슨 목표 */}
+      <SectionCard icon={SlidersHorizontal} title="레슨 목표">
+        <p className="text-xs text-muted-foreground -mt-1">진행 가능한 레슨 목표를 선택하세요. (복수 선택 가능)</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {GOAL_OPTIONS.map(({ label, desc }) => {
+            const selected = goals.includes(label);
+            return (
+              <button
+                type="button"
+                key={label}
+                onClick={() => toggleArr(goals, setGoals, label)}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/30 hover:bg-muted/40"
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center transition-colors ${
+                    selected ? "border-primary bg-primary" : "border-muted-foreground/40"
+                  }`}
+                >
+                  {selected && <span className="w-1.5 h-1.5 rounded-full bg-white block" />}
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold ${selected ? "text-primary" : "text-foreground"}`}>{label}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </SectionCard>
+
+      {/* 3. 학력 */}
       <SectionCard icon={GraduationCap} title="학력">
         <p className="text-xs text-muted-foreground -mt-1">최신 학력부터 입력하세요.</p>
         <div className="space-y-2">
@@ -426,7 +471,8 @@ export default function TutorProfilePage() {
         <button
           type="button"
           onClick={addFee}
-          className="w-full py-2.5 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+          disabled={fees.length >= 3}
+          className="w-full py-2.5 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
         >
           <Plus size={14} /> 레슨비 항목 추가
         </button>

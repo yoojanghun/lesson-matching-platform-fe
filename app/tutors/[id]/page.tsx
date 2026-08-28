@@ -10,14 +10,12 @@ import {
   Star,
   MapPin,
   Video,
-  Clock,
+  Info,
   CheckCircle2,
   GraduationCap,
   Briefcase,
-  BookOpen,
   ChevronDown,
   ChevronUp,
-  Award,
 } from 'lucide-react';
 import { TUTORS, REVIEWS as INITIAL_REVIEWS } from '../../data/mockData';
 import StarRow from '../../components/StarRow';
@@ -34,6 +32,10 @@ const RATING_DIST = [
   { star: 1, count: 0 },
 ];
 const TOTAL_RATINGS = RATING_DIST.reduce((s, r) => s + r.count, 0);
+const DISPLAYABLE_LESSON_GOALS = [
+  { label: '취미', values: ['취미', '취미 / 여가', 'HOBBY'] },
+  { label: '입시', values: ['입시', '입시 / 진학', 'EXAM'] },
+];
 
 export default function TutorDetailPage() {
   const router = useRouter();
@@ -49,17 +51,49 @@ export default function TutorDetailPage() {
   const createReviewMutation = useCreateReviewMutation();
 
   const tutor = tutorQueryData ?? TUTORS.find((t) => t.id === tutorId) ?? TUTORS[0];
+  const lessonGoals = DISPLAYABLE_LESSON_GOALS
+    .filter(({ values }) => tutor.lessonGoals?.some((goal) => values.includes(goal)))
+    .map(({ label }) => label);
+  const lessonType = tutor.lessonType ?? (
+    tutor.onlineAvailable && tutor.location
+      ? '대면 / 온라인 수업'
+      : tutor.onlineAvailable
+        ? '온라인 수업'
+        : tutor.location
+          ? '대면 수업'
+          : undefined
+  );
+  const lessonLocations = tutor.lessonLocations?.length
+    ? tutor.lessonLocations
+    : tutor.location
+      ? [tutor.location.replace(/\s*\(대면 가능\)\s*$/, '')]
+      : [];
+  const locationsByRegion = lessonLocations.reduce<Record<string, string[]>>((groups, location) => {
+    const [region] = location.split(' ');
+    (groups[region] ??= []).push(location);
+    return groups;
+  }, {});
 
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeSections, setActiveSections] = useState<Set<string>>(() => new Set(['edu', 'career']));
 
   const allReviews = reviews.length > 0 ? reviews : INITIAL_REVIEWS;
   const visibleReviews = showAllReviews ? allReviews : allReviews.slice(0, 3);
 
-  const toggle = (key: string) => setActiveSection(activeSection === key ? null : key);
+  const toggle = (key: string) => {
+    setActiveSections((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,23 +142,18 @@ export default function TutorDetailPage() {
               )}
             </div>
             <div className="flex gap-2 mb-1">
-              <span
-                className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                  tutor.available ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                }`}
-              >
-                {tutor.available ? '● 수업 가능' : '● 마감'}
-              </span>
-              {tutor.onlineAvailable && (
+              {lessonType && (
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-blue-50 text-blue-600 flex items-center gap-1">
-                  <Video size={11} /> 온라인 가능
+                  <Video size={11} /> {lessonType}
                 </span>
               )}
             </div>
           </div>
 
           <h1 className="text-xl font-bold text-foreground">{tutor.name} 튜터</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{tutor.subject}</p>
+          {lessonGoals.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-0.5">{lessonGoals.join(' · ')}</p>
+          )}
 
           <div className="flex items-center gap-2 mt-2">
             <StarRow rating={tutor.rating} size={16} />
@@ -133,14 +162,9 @@ export default function TutorDetailPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs text-muted-foreground">
-            {tutor.location && (
+            {lessonLocations.length > 0 && (
               <span className="flex items-center gap-1">
-                <MapPin size={12} /> {tutor.location}
-              </span>
-            )}
-            {tutor.responseTime && (
-              <span className="flex items-center gap-1">
-                <Clock size={12} /> 응답 {tutor.responseTime}
+                <MapPin size={12} /> {lessonLocations[0]}{lessonLocations.length > 1 ? ` 외 ${lessonLocations.length - 1}곳` : ''}
               </span>
             )}
           </div>
@@ -157,82 +181,6 @@ export default function TutorDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* 통계 바 */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { icon: BookOpen, label: '총 레슨 수', value: `${tutor.totalLessons ?? '240+'}회` },
-          { icon: CheckCircle2, label: '응답률', value: `${tutor.responseRate ?? 98}%` },
-          { icon: Award, label: '수상 이력', value: '콩쿠르 대상' },
-        ].map(({ icon: Icon, label, value }) => (
-          <div key={label} className="bg-card border border-border rounded-xl p-4 text-center shadow-sm">
-            <div className="flex justify-center mb-1.5">
-              <Icon size={18} className="text-accent" />
-            </div>
-            <p className="text-lg font-bold text-foreground">{value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* 레슨비 옵션 */}
-      {tutor.lessonOptions && (
-        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-          <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
-            <span className="w-1 h-4 bg-accent rounded-full inline-block" />
-            레슨비 안내
-          </h2>
-          <div className="grid grid-cols-3 gap-3">
-            {tutor.lessonOptions.map((opt) => (
-              <div
-                key={opt.label}
-                className={`rounded-xl border p-4 text-center ${
-                  opt.label === '기본 수업' ? 'border-primary/40 bg-secondary' : 'border-border'
-                }`}
-              >
-                {opt.label === '기본 수업' && (
-                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full mb-2 inline-block">
-                    추천
-                  </span>
-                )}
-                <p className="text-xs text-muted-foreground">{opt.label}</p>
-                <p className="text-lg font-bold text-foreground mt-1">{opt.price.toLocaleString()}원</p>
-                <p className="text-xs text-muted-foreground">{opt.duration}</p>
-              </div>
-            ))}
-          </div>
-
-          {tutor.available && (
-            <div className="mt-5 flex gap-3 flex-col sm:flex-row">
-              <button
-                type="button"
-                onClick={() => router.push(`/chat?tutorId=${tutor.id}`)}
-                className="flex-1 py-3 bg-secondary border border-primary/20 text-primary rounded-xl text-sm font-semibold hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-              >
-                <MessageSquare size={15} /> 1:1 채팅 문의
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (role === 'GUEST') {
-                    router.push('/login');
-                  } else {
-                    router.push(`/matching-request/${tutor.id}`);
-                  }
-                }}
-                className="flex-1 py-3 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-              >
-                <Send size={15} /> 레슨 매칭 요청하기
-              </button>
-            </div>
-          )}
-          {role === 'GUEST' && (
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              매칭 요청 및 채팅 문의를 하려면 로그인이 필요합니다.
-            </p>
-          )}
-        </div>
-      )}
 
       {/* 튜터 소개 */}
       <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
@@ -272,13 +220,13 @@ export default function TutorDetailPage() {
               <GraduationCap size={16} className="text-primary" />
               학력
             </h2>
-            {activeSection === 'edu' ? (
+            {activeSections.has('edu') ? (
               <ChevronUp size={16} className="text-muted-foreground" />
             ) : (
               <ChevronDown size={16} className="text-muted-foreground" />
             )}
           </button>
-          {activeSection === 'edu' && (
+          {activeSections.has('edu') && (
             <div className="px-5 pb-5 space-y-2.5 border-t border-border pt-4">
               {tutor.education.map((edu, i) => (
                 <div key={i} className="flex items-start gap-2.5">
@@ -302,13 +250,13 @@ export default function TutorDetailPage() {
               <Briefcase size={16} className="text-primary" />
               경력
             </h2>
-            {activeSection === 'career' ? (
+            {activeSections.has('career') ? (
               <ChevronUp size={16} className="text-muted-foreground" />
             ) : (
               <ChevronDown size={16} className="text-muted-foreground" />
             )}
           </button>
-          {activeSection === 'career' && (
+          {activeSections.has('career') && (
             <div className="px-5 pb-5 border-t border-border pt-4">
               <div className="relative pl-4 space-y-5">
                 <div className="absolute left-0 top-1 bottom-1 w-px bg-border" />
@@ -322,6 +270,96 @@ export default function TutorDetailPage() {
                 ))}
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {lessonLocations.length > 0 && (
+        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h2 className="text-base font-bold text-foreground flex items-center gap-3">
+              <span className="w-1 h-5 bg-accent rounded-full inline-block" />
+              가능한 레슨 장소
+            </h2>
+            <span className="px-2.5 py-1 rounded-full bg-secondary text-xs font-semibold text-muted-foreground">
+              총 {lessonLocations.length}곳
+            </span>
+          </div>
+          <div className="px-5 py-5 space-y-5">
+            {Object.entries(locationsByRegion).map(([region, locations]) => (
+              <section key={region}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm font-semibold text-foreground">{region}</span>
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-600 text-[11px] font-semibold flex items-center justify-center">
+                    {locations.length}
+                  </span>
+                </div>
+                <ul className="flex flex-wrap gap-2">
+                  {locations.map((location) => (
+                    <li
+                      key={location}
+                      className="px-3 py-1.5 rounded-full border border-amber-200 bg-amber-50/40 text-sm text-amber-700"
+                    >
+                      <span className="mr-1 text-amber-500">•</span>{location}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
+              <Info size={13} className="text-slate-400 shrink-0" />
+              선생님이 직접 방문하거나 학생이 방문하는 방식 모두 협의 가능합니다.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 레슨비 옵션 */}
+      {tutor.lessonOptions && (
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+          <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
+            <span className="w-1 h-4 bg-accent rounded-full inline-block" />
+            레슨비 안내
+          </h2>
+          <div className="grid grid-cols-3 gap-3">
+            {tutor.lessonOptions.map((opt) => (
+              <div key={opt.label} className="rounded-xl border border-border bg-white p-4 text-center">
+                <p className="text-xs text-muted-foreground">{opt.label}</p>
+                <p className="text-lg font-bold text-foreground mt-1">{opt.price.toLocaleString()}원</p>
+                <p className="text-xs text-muted-foreground">{opt.duration}</p>
+              </div>
+            ))}
+          </div>
+
+          {tutor.available && (
+            <div className="mt-5 flex gap-3 flex-col sm:flex-row">
+              <button
+                type="button"
+                onClick={() => router.push(`/chat?tutorId=${tutor.id}`)}
+                className="flex-1 py-3 bg-secondary border border-primary/20 text-primary rounded-xl text-sm font-semibold hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <MessageSquare size={15} /> 1:1 채팅 문의
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (role === 'GUEST') {
+                    router.push('/login');
+                  } else {
+                    router.push(`/matching-request/${tutor.id}`);
+                  }
+                }}
+                className="flex-1 py-3 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Send size={15} /> 레슨 매칭 요청하기
+              </button>
+            </div>
+          )}
+          {role === 'GUEST' && (
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              매칭 요청 및 채팅 문의를 하려면 로그인이 필요합니다.
+            </p>
           )}
         </div>
       )}

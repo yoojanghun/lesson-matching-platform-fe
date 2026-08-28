@@ -11,13 +11,13 @@ const NAV_ITEMS_STUDENT = [
   { label: "홈", path: "/" },
   { label: "튜터 찾기", path: "/tutors" },
   { label: "내 매칭", path: "/my-matchings" },
-  { label: "내 프로필", path: "/student-profile" },
+  { label: "내 프로필", path: "/profile" },
 ];
 
 const NAV_ITEMS_TUTOR = [
   { label: "홈", path: "/" },
   { label: "내 매칭", path: "/my-matchings" },
-  { label: "내 프로필", path: "/tutor-profile" },
+  { label: "내 프로필", path: "/profile" },
 ];
 
 export default function Navbar() {

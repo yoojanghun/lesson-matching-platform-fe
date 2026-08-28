@@ -20,7 +20,7 @@ import { useReferencesQuery } from '../hooks/queries/useReferences';
 /* ── 선택지 데이터 ── */
 const GOAL_OPTIONS = [
   { label: "취미 / 여가", desc: "즐기기 위해 배우고 싶어요" },
-  { label: "기초 다지기", desc: "기본기를 탄탄히 하고 싶어요" },
+  { label: "콩쿠르 준비", desc: "콩쿠르를 준비 중이에요" },
   { label: "입시 / 진학", desc: "시험 준비가 목적이에요" },
   { label: "자격증 취득", desc: "공식 자격증을 따고 싶어요" },
   { label: "단기 성취", desc: "좋아하는 곡 하나를 완벽히 연주해내고 싶어요" },
@@ -60,7 +60,7 @@ const TIME_OPTIONS = [
 
 const GOAL_API_VALUES: Record<string, string> = {
   "취미 / 여가": "HOBBY",
-  "기초 다지기": "BASIC",
+  "콩쿠르 준비": "COMPETITION",
   "입시 / 진학": "EXAM",
   "자격증 취득": "CERTIFICATE",
   "단기 성취": "SHORT_TERM",

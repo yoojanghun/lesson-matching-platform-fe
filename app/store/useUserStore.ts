@@ -48,6 +48,40 @@ export interface UserState {
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
+function encodeBase64Url(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  const normalized = typeof window !== 'undefined' && typeof window.btoa === 'function'
+    ? window.btoa(binary)
+    : typeof Buffer !== 'undefined'
+      ? Buffer.from(bytes).toString('base64')
+      : '';
+
+  return normalized.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function persistAuthToken(account: TestAccount) {
+  if (typeof window === 'undefined') return;
+
+  const payload = {
+    sub: account.email,
+    roles: [account.role],
+    name: account.name,
+    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+  };
+
+  const header = encodeBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = encodeBase64Url(JSON.stringify(payload));
+  const signature = encodeBase64Url('mock-signature');
+
+  localStorage.setItem('tm_token', `${header}.${body}.${signature}`);
+}
+
 export const useUserStore = create<UserState>()(
   persist(
     (set, get) => ({
@@ -77,6 +111,7 @@ export const useUserStore = create<UserState>()(
         );
         if (account) {
           set({ role: account.role, userName: account.name });
+          persistAuthToken(account);
           get().showToast(`${account.name}님, 환영합니다!`);
           return true;
         }
@@ -85,6 +120,7 @@ export const useUserStore = create<UserState>()(
 
       quickLogin: (account: TestAccount) => {
         set({ role: account.role, userName: account.name });
+        persistAuthToken(account);
         get().showToast(`${account.name}님, 환영합니다!`);
       },
 
