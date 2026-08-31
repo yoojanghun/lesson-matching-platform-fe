@@ -73,6 +73,11 @@ export default function TutorDetailPage() {
     (groups[region] ??= []).push(location);
     return groups;
   }, {});
+  const publicContactItems = [
+    tutor.phoneNumberPublic && tutor.phoneNumber ? tutor.phoneNumber : null,
+    tutor.emailPublic && tutor.email ? tutor.email : null,
+    tutor.birthDatePublic && tutor.birthDate ? `${tutor.birthDate.slice(0, 4)}년생` : null,
+  ].filter((item): item is string => Boolean(item));
 
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
@@ -179,6 +184,11 @@ export default function TutorDetailPage() {
               </span>
             ))}
           </div>
+          {publicContactItems.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-3">
+              {publicContactItems.join(' · ')}
+            </p>
+          )}
         </div>
       </div>
 
@@ -188,6 +198,9 @@ export default function TutorDetailPage() {
           <span className="w-1 h-4 bg-accent rounded-full inline-block" />
           튜터 소개
         </h2>
+        {tutor.title && (
+          <p className="text-base font-bold text-foreground mb-3">{tutor.title}</p>
+        )}
         <p className="text-sm text-foreground leading-relaxed">{tutor.fullIntro ?? tutor.intro}</p>
       </div>
 

@@ -39,7 +39,8 @@ export interface StudentProfileResponse {
   locations: ProfileLocationDto[];
   introduction: string | null;
   lessonType: string | null;
-  budgetType: string | null;
+  budgetTypes?: string[];
+  budgetType?: string | null;
 }
 
 export interface TutorProfileResponse {
@@ -48,6 +49,9 @@ export interface TutorProfileResponse {
   birthDate: string;
   email: string;
   phoneNumber: string;
+  birthDatePublic?: boolean;
+  emailPublic?: boolean;
+  phoneNumberPublic?: boolean;
   title: string | null;
   content: string | null;
   introduction: string | null;
@@ -66,11 +70,16 @@ export interface StudentProfileRequest {
   locationIds?: number[];
   introduction?: string;
   lessonType?: string;
-  budgetType?: string;
+  budgetTypes?: string[];
 }
 
 export interface TutorProfileRequest {
   phoneNumber?: string;
+  email?: string;
+  birthDate?: string;
+  birthDatePublic?: boolean;
+  emailPublic?: boolean;
+  phoneNumberPublic?: boolean;
   styleIds?: number[];
   categoryIds?: number[];
   subjectIds?: number[];

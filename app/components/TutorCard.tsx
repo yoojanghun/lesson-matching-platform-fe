@@ -49,7 +49,7 @@ export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: (
             <span className="text-xs font-medium text-foreground">{tutor.rating}</span>
             <span className="text-xs text-muted-foreground">({tutor.reviews}개 리뷰)</span>
           </div>
-          <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{tutor.intro}</p>
+          <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{tutor.title ?? tutor.intro}</p>
           <div className="flex flex-wrap gap-1 mt-3">
             {tutor.tags.map((tag) => (
               <span key={tag} className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded text-xs">

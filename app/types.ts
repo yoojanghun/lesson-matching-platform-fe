@@ -46,6 +46,7 @@ export interface Career {
 export interface Tutor {
   id: number;
   name: string;
+  title?: string;
   subject: string;
   lessonGoals?: string[];
   rating: number;
@@ -57,6 +58,12 @@ export interface Tutor {
   available: boolean;
   lessonType?: "대면 수업" | "온라인 수업" | "대면 / 온라인 수업";
   lessonLocations?: string[];
+  birthDate?: string;
+  email?: string;
+  phoneNumber?: string;
+  birthDatePublic?: boolean;
+  emailPublic?: boolean;
+  phoneNumberPublic?: boolean;
   fullIntro?: string;
   education?: string[];
   careers?: Career[];
@@ -169,7 +176,9 @@ export interface StudentProfile {
   styles: string[];
   lessonType: "대면 수업" | "온라인 수업" | "둘 다 가능" | "";
   location: string;
-  budget: string;
+  budget: string[];
+  budgetMin?: number;
+  budgetMax?: number;
   days: string[];
   times: string[];
   memo: string;
@@ -178,7 +187,13 @@ export interface StudentProfile {
 
 export interface TutorProfileData {
   name: string;
-  age: string;
+  title: string;
+  birthDate: string;
+  email: string;
+  phoneNumber: string;
+  birthDatePublic: boolean;
+  emailPublic: boolean;
+  phoneNumberPublic: boolean;
   location: string;
   subjects: string[];
   goals: string[];

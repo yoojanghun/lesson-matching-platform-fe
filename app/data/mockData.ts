@@ -57,6 +57,7 @@ export const TUTORS: Tutor[] = [
   {
     id: 1,
     name: "김지수",
+    title: "한예종 피아노과 출신. 기초부터 연주회 준비까지 맞춤 지도합니다.",
     subject: "피아노 · 음악이론",
     lessonGoals: ["입시"],
     rating: 4.9,
@@ -68,6 +69,12 @@ export const TUTORS: Tutor[] = [
     available: true,
     lessonType: "대면 / 온라인 수업",
     lessonLocations: ["서울 강남구", "서울 서초구", "서울 송파구", "서울 마포구", "서울 용산구", "경기 성남시", "경기 고양시"],
+    birthDate: "1995-04-12",
+    email: "jisoo.kim@example.com",
+    phoneNumber: "010-1234-5678",
+    birthDatePublic: true,
+    emailPublic: true,
+    phoneNumberPublic: true,
     fullIntro:
       "안녕하세요, 피아노 튜터 김지수입니다. 한국예술종합학교 피아노과를 졸업하고 6년간 레슨 및 연주 활동을 해왔습니다. 클래식 기초부터 재즈 즉흥연주, 입시 준비까지 다양한 레슨이 가능합니다. 첫 수업 전 무료 상담을 통해 학생의 수준과 목표에 맞는 커리큘럼을 설계해 드립니다.",
     education: [

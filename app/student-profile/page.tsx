@@ -41,13 +41,11 @@ const STYLE_OPTIONS = [
 const LESSON_TYPE_OPTIONS = ["대면 수업", "온라인 수업", "둘 다 가능"] as const;
 type LessonType = typeof LESSON_TYPE_OPTIONS[number];
 
-const BUDGET_OPTIONS = [
-  "5만원 이하 / 회",
-  "5~7만원 / 회",
-  "7~10만원 / 회",
-  "10만원 이상 / 회",
-  "상관없음",
-];
+const MIN_BUDGET = 0;
+const MAX_BUDGET = 200000;
+const BUDGET_STEP = 5000;
+const DEFAULT_MIN_BUDGET = 30000;
+const DEFAULT_MAX_BUDGET = 100000;
 
 const DAY_OPTIONS = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -154,11 +152,79 @@ export default function StudentProfilePage() {
   const [styles, setStyles] = useState<string[]>([]);
   const [lessonType, setLessonType] = useState<LessonType | "">("");
   const [location, setLocation] = useState("");
-  const [budget, setBudget] = useState("");
+  const [budgetMin, setBudgetMin] = useState(DEFAULT_MIN_BUDGET);
+  const [budgetMax, setBudgetMax] = useState(DEFAULT_MAX_BUDGET);
   const [days, setDays] = useState<string[]>([]);
   const [times, setTimes] = useState<string[]>([]);
   const [memo, setMemo] = useState("");
   const [saved, setSaved] = useState(false);
+
+  const formatBudgetLabel = (value: number) => {
+    if (value >= MAX_BUDGET) return "20만원+";
+    return `${Math.round(value / 10000)}만원`;
+  };
+
+  const getBudgetTrackStyle = () => {
+    const minPercent = (budgetMin / MAX_BUDGET) * 100;
+    const maxPercent = (budgetMax / MAX_BUDGET) * 100;
+
+    return {
+      left: `${minPercent}%`,
+      width: `${Math.max(maxPercent - minPercent, 0)}%`,
+    };
+  };
+
+  const budgetFromRange = (min: number, max: number) => {
+    const budgetTypes: string[] = [];
+
+    if (max >= 200000) budgetTypes.push("OVER_100K");
+    if (min <= 50000 && max >= 50000) budgetTypes.push("UNDER_50K");
+    if (min <= 70000 && max >= 50000) budgetTypes.push("BETWEEN_50K_70K");
+    if (min <= 100000 && max >= 70000) budgetTypes.push("BETWEEN_70K_100K");
+
+    return [...new Set(budgetTypes)];
+  };
+
+  const budgetRangeFromLegacy = (values: string[] = []) => {
+    const minValues = {
+      UNDER_50K: 0,
+      BETWEEN_50K_70K: 50000,
+      BETWEEN_70K_100K: 70000,
+      OVER_100K: 100000,
+      NEGOTIABLE: 0,
+    } as const;
+
+    const maxValues = {
+      UNDER_50K: 50000,
+      BETWEEN_50K_70K: 70000,
+      BETWEEN_70K_100K: 100000,
+      OVER_100K: 200000,
+      NEGOTIABLE: 200000,
+    } as const;
+
+    const mapped = values
+      .map((value) => ({ value, min: minValues[value as keyof typeof minValues] ?? 0, max: maxValues[value as keyof typeof maxValues] ?? 200000 }))
+      .filter((entry) => entry.min !== undefined && entry.max !== undefined);
+
+    if (!mapped.length) {
+      return { min: DEFAULT_MIN_BUDGET, max: DEFAULT_MAX_BUDGET };
+    }
+
+    const min = Math.min(...mapped.map((entry) => entry.min));
+    const max = Math.max(...mapped.map((entry) => entry.max));
+
+    return { min: Math.min(Math.max(min, MIN_BUDGET), MAX_BUDGET), max: Math.min(Math.max(max, MIN_BUDGET), MAX_BUDGET) };
+  };
+
+  const handleBudgetMinChange = (value: number) => {
+    const nextMin = Math.min(Math.max(value, MIN_BUDGET), budgetMax - BUDGET_STEP);
+    setBudgetMin(nextMin);
+  };
+
+  const handleBudgetMaxChange = (value: number) => {
+    const nextMax = Math.max(Math.min(value, MAX_BUDGET), budgetMin + BUDGET_STEP);
+    setBudgetMax(nextMax);
+  };
 
   // 저장된 프로필이 있다면 불러오기
   useEffect(() => {
@@ -168,7 +234,16 @@ export default function StudentProfilePage() {
       setStyles(savedProfile.styles || []);
       setLessonType(savedProfile.lessonType || "");
       setLocation(savedProfile.location || "");
-      setBudget(savedProfile.budget || "");
+
+      const range = savedProfile.budgetMin !== undefined || savedProfile.budgetMax !== undefined
+        ? {
+            min: savedProfile.budgetMin ?? DEFAULT_MIN_BUDGET,
+            max: savedProfile.budgetMax ?? DEFAULT_MAX_BUDGET,
+          }
+        : budgetRangeFromLegacy(savedProfile.budget || []);
+
+      setBudgetMin(range.min);
+      setBudgetMax(range.max);
       setDays(savedProfile.days || []);
       setTimes(savedProfile.times || []);
       setMemo(savedProfile.memo || "");
@@ -192,7 +267,10 @@ export default function StudentProfilePage() {
     ).filter(Boolean));
     setLessonType(Object.entries(LESSON_TYPE_API_VALUES).find(([, value]) => value === profile.lessonType)?.[0] as LessonType | undefined ?? '');
     setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
-    setBudget(Object.entries(BUDGET_API_VALUES).find(([, value]) => value === profile.budgetType)?.[0] ?? '');
+    const budgetTypes = profile.budgetTypes ?? (profile.budgetType ? [profile.budgetType] : []);
+    const range = budgetRangeFromLegacy(budgetTypes);
+    setBudgetMin(range.min);
+    setBudgetMax(range.max);
     setMemo(profile.introduction ?? '');
   }, [categories, profileQuery.data, references]);
 
@@ -209,13 +287,17 @@ export default function StudentProfilePage() {
     set((prev) => (prev.includes(val) ? prev.filter((x) => x !== val) : [...prev, val]));
 
   const handleSave = () => {
+    const normalizedBudget = budgetFromRange(budgetMin, budgetMax);
+
     const profileData: StudentProfile = {
       interests,
       goals,
       styles,
       lessonType,
       location,
-      budget,
+      budget: normalizedBudget,
+      budgetMin,
+      budgetMax,
       days,
       times,
       memo,
@@ -227,7 +309,7 @@ export default function StudentProfilePage() {
       locationIds: references?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
       introduction: memo,
       lessonType: lessonType ? LESSON_TYPE_API_VALUES[lessonType] : undefined,
-      budgetType: budget ? BUDGET_API_VALUES[budget] : undefined,
+      budgetTypes: normalizedBudget,
     }, {
       onSuccess: () => {
         saveStudentProfile(profileData);
@@ -360,22 +442,55 @@ export default function StudentProfilePage() {
 
       {/* 7. 예산 */}
       <SectionCard icon={Wallet} title="레슨비 예산">
-        <p className="text-xs text-muted-foreground -mt-1">1회 레슨 기준으로 생각하는 예산 범위를 선택하세요.</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {BUDGET_OPTIONS.map((b) => (
-            <button
-              type="button"
-              key={b}
-              onClick={() => setBudget(b)}
-              className={`py-2.5 px-3 rounded-xl text-sm font-semibold border text-center transition-all cursor-pointer ${
-                budget === b
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-card text-muted-foreground border-border hover:border-primary/40"
-              }`}
-            >
-              {b}
-            </button>
-          ))}
+        <p className="text-xs text-muted-foreground -mt-1">1회 레슨 기준으로 원하는 예산 범위를 설정하세요.</p>
+
+        <div className="space-y-5" aria-label="레슨비 예산 범위 선택">
+          <div className="flex items-center justify-between text-sm font-medium text-foreground">
+            <span>최소</span>
+            <span>최대</span>
+          </div>
+
+          <div className="flex items-center justify-between text-xl font-bold text-foreground">
+            <span>{formatBudgetLabel(budgetMin)}</span>
+            <span>{budgetMax >= MAX_BUDGET ? "20만원+" : formatBudgetLabel(budgetMax)}</span>
+          </div>
+
+          <div className="relative h-12 pt-2">
+            <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-[#dfe3e8]" />
+            <div
+              className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-[#1d7af7]"
+              style={getBudgetTrackStyle()}
+            />
+
+            <input
+              type="range"
+              min={MIN_BUDGET}
+              max={MAX_BUDGET}
+              step={BUDGET_STEP}
+              value={budgetMin}
+              onChange={(event) => handleBudgetMinChange(Number(event.target.value))}
+              className="budget-range-input"
+              aria-label="최소 예산 선택"
+            />
+            <input
+              type="range"
+              min={MIN_BUDGET}
+              max={MAX_BUDGET}
+              step={BUDGET_STEP}
+              value={budgetMax}
+              onChange={(event) => handleBudgetMaxChange(Number(event.target.value))}
+              className="budget-range-input"
+              aria-label="최대 예산 선택"
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
+            {[0, 50000, 100000, 150000, 200000].map((value) => (
+              <span key={value} className="min-w-0 text-center">
+                {value === 200000 ? "20만+" : `${Math.round(value / 10000)}만`}
+              </span>
+            ))}
+          </div>
         </div>
       </SectionCard>
 

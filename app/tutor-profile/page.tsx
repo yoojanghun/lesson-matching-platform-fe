@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { startTransition, useState, useEffect } from 'react';
 import {
   User,
   GraduationCap,
@@ -14,6 +14,8 @@ import {
   Trash2,
   CheckCircle2,
   ChevronDown,
+  Eye,
+  EyeOff,
   X,
 } from 'lucide-react';
 import { useUserStore } from '../store/useUserStore';
@@ -108,6 +110,24 @@ function InputRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
+function PrivacyToggle({ isPublic, onClick }: { isPublic: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
+        isPublic
+          ? "border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100"
+          : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+      }`}
+      aria-label={isPublic ? "비공개로 변경" : "공개로 변경"}
+    >
+      {isPublic ? <Eye size={13} /> : <EyeOff size={13} />}
+      {isPublic ? "공개" : "비공개"}
+    </button>
+  );
+}
+
 const INPUT_BASE = "w-full px-4 py-3 border border-border rounded-xl text-sm text-foreground bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40";
 
 let _id = 100;
@@ -125,7 +145,12 @@ export default function TutorProfilePage() {
 
   /* 기본 정보 */
   const [name, setName] = useState(userName || "");
-  const [age, setAge] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [birthDatePublic, setBirthDatePublic] = useState(false);
+  const [emailPublic, setEmailPublic] = useState(true);
+  const [phoneNumberPublic, setPhoneNumberPublic] = useState(true);
   const [location, setLocation] = useState("");
   const [subjects, setSubjects] = useState<string[]>(["피아노"]);
   const [goals, setGoals] = useState<string[]>([]);
@@ -154,6 +179,7 @@ export default function TutorProfilePage() {
   const [lessonType, setLessonType] = useState<LessonType | "">("둘 다 가능");
 
   /* 자기 소개 */
+  const [title, setTitle] = useState("");
   const [intro, setIntro] = useState("");
 
   /* 저장 */
@@ -162,24 +188,32 @@ export default function TutorProfilePage() {
   // 저장된 프로필이 있다면 불러오기
   useEffect(() => {
     if (savedProfile) {
-      if (savedProfile.name) setName(savedProfile.name);
-      setAge(savedProfile.age || "");
-      setLocation(savedProfile.location || "");
-      setSubjects(savedProfile.subjects || []);
-      setGoals(savedProfile.goals || []);
-      if (savedProfile.educations && savedProfile.educations.length > 0) {
-        setEducations(savedProfile.educations);
-      }
-      if (savedProfile.careers && savedProfile.careers.length > 0) {
-        setCareers(savedProfile.careers);
-      }
-      if (savedProfile.fees && savedProfile.fees.length > 0) {
-        setFees(savedProfile.fees.slice(0, 3));
-      }
-      setTeachStyles(savedProfile.teachStyles || []);
-      setTeachNote(savedProfile.teachNote || "");
-      setLessonType(savedProfile.lessonType || "");
-      setIntro(savedProfile.intro || "");
+      startTransition(() => {
+        if (savedProfile.name) setName(savedProfile.name);
+        setBirthDate(savedProfile.birthDate || "");
+        setEmail(savedProfile.email || "");
+        setPhoneNumber(savedProfile.phoneNumber || "");
+        setBirthDatePublic(savedProfile.birthDatePublic ?? false);
+        setEmailPublic(savedProfile.emailPublic ?? true);
+        setPhoneNumberPublic(savedProfile.phoneNumberPublic ?? true);
+        setLocation(savedProfile.location || "");
+        setSubjects(savedProfile.subjects || []);
+        setGoals(savedProfile.goals || []);
+        if (savedProfile.educations && savedProfile.educations.length > 0) {
+          setEducations(savedProfile.educations);
+        }
+        if (savedProfile.careers && savedProfile.careers.length > 0) {
+          setCareers(savedProfile.careers);
+        }
+        if (savedProfile.fees && savedProfile.fees.length > 0) {
+          setFees(savedProfile.fees.slice(0, 3));
+        }
+        setTeachStyles(savedProfile.teachStyles || []);
+        setTeachNote(savedProfile.teachNote || "");
+        setLessonType(savedProfile.lessonType || "");
+        setTitle(savedProfile.title || "");
+        setIntro(savedProfile.intro || "");
+      });
     }
   }, [savedProfile]);
 
@@ -187,15 +221,24 @@ export default function TutorProfilePage() {
     const profile = profileQuery.data;
     if (!profile) return;
 
-    setName(profile.name || userName || '');
-    setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
-    setSubjects(profile.categories.map((category) =>
-      categories?.find((item) => item.categoryName === category.categoryType)?.description ?? category.categoryType ?? ''
-    ).filter(Boolean));
-    setTeachStyles(profile.styles.map((style) => style.description ?? '').filter(Boolean));
-    setTeachNote(profile.content ?? '');
-    setIntro(profile.introduction ?? '');
-    setCareers(profile.career ? profile.career.split('\n').map((text, index) => ({ id: index + 1, text })) : [{ id: uid(), text: '' }]);
+    startTransition(() => {
+      setName(profile.name || userName || '');
+      setBirthDate(profile.birthDate || '');
+      setEmail(profile.email || '');
+      setPhoneNumber(profile.phoneNumber || '');
+      setBirthDatePublic(profile.birthDatePublic ?? false);
+      setEmailPublic(profile.emailPublic ?? true);
+      setPhoneNumberPublic(profile.phoneNumberPublic ?? true);
+      setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
+      setSubjects(profile.categories.map((category) =>
+        categories?.find((item) => item.categoryName === category.categoryType)?.description ?? category.categoryType ?? ''
+      ).filter(Boolean));
+      setTeachStyles(profile.styles.map((style) => style.description ?? '').filter(Boolean));
+      setTeachNote(profile.content ?? '');
+      setTitle(profile.title ?? '');
+      setIntro(profile.introduction ?? '');
+      setCareers(profile.career ? profile.career.split('\n').map((text, index) => ({ id: index + 1, text })) : [{ id: uid(), text: '' }]);
+    });
   }, [categories, profileQuery.data, references, userName]);
 
   if (role === 'GUEST') {
@@ -229,7 +272,13 @@ export default function TutorProfilePage() {
   const handleSave = () => {
     const profileData: TutorProfileData = {
       name,
-      age,
+      title,
+      birthDate,
+      email,
+      phoneNumber,
+      birthDatePublic,
+      emailPublic,
+      phoneNumberPublic,
       location,
       subjects,
       goals,
@@ -242,6 +291,13 @@ export default function TutorProfilePage() {
       intro,
     };
     saveProfileMutation.mutate({
+      title: title || undefined,
+      email: email || undefined,
+      phoneNumber: phoneNumber || undefined,
+      birthDate: birthDate || undefined,
+      birthDatePublic,
+      emailPublic,
+      phoneNumberPublic,
       categoryIds: categories?.filter((category) => subjects.includes(category.description)).map((category) => category.categoryId),
       subjectIds: categories?.filter((category) => subjects.includes(category.description)).flatMap((category) => category.subjects.map((subject) => subject.subjectId)),
       styleIds: references?.tutorStyles.filter((style) => teachStyles.includes(style.description)).map((style) => style.id),
@@ -270,8 +326,11 @@ export default function TutorProfilePage() {
 
       {/* 1. 기본 정보 */}
       <SectionCard icon={User} title="기본 정보">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <InputRow label="이름">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <div className="flex h-7 items-center">
+              <label className="text-[11px] font-semibold text-muted-foreground">이름</label>
+            </div>
             <input
               type="text"
               placeholder="예) 김지수"
@@ -279,16 +338,47 @@ export default function TutorProfilePage() {
               onChange={(e) => setName(e.target.value)}
               className={INPUT_BASE}
             />
-          </InputRow>
-          <InputRow label="나이">
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex h-7 items-center justify-between">
+              <label className="text-[11px] font-semibold text-muted-foreground">생년월일</label>
+              <PrivacyToggle isPublic={birthDatePublic} onClick={() => setBirthDatePublic((current) => !current)} />
+            </div>
             <input
-              type="number"
-              placeholder="예) 28"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
               className={INPUT_BASE}
             />
-          </InputRow>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-semibold text-muted-foreground">이메일</label>
+              <PrivacyToggle isPublic={emailPublic} onClick={() => setEmailPublic((current) => !current)} />
+            </div>
+            <input
+              type="email"
+              placeholder="예) tutor@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={INPUT_BASE}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-semibold text-muted-foreground">전화번호</label>
+              <PrivacyToggle isPublic={phoneNumberPublic} onClick={() => setPhoneNumberPublic((current) => !current)} />
+            </div>
+            <input
+              type="tel"
+              placeholder="예) 010-1234-5678"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              className={INPUT_BASE}
+            />
+          </div>
         </div>
         <InputRow label="활동 지역">
           <input
@@ -553,14 +643,25 @@ export default function TutorProfilePage() {
 
       {/* 7. 자기소개 */}
       <SectionCard icon={Clock} title="선생님 소개글">
-        <p className="text-xs text-muted-foreground -mt-1">학생들에게 보여질 상세한 자기소개를 작성하세요.</p>
-        <textarea
-          rows={5}
-          placeholder="예) 안녕하세요! 학생 개개인의 속도와 성향에 맞추어 즐겁고 탄탄한 기본기를 길러드립니다. 클래식 입시부터 취미 연주까지 친절하게 지도합니다."
-          value={intro}
-          onChange={(e) => setIntro(e.target.value)}
-          className={`${INPUT_BASE} resize-none leading-relaxed`}
-        />
+        <InputRow label="레슨 제목">
+          <input
+            type="text"
+            placeholder="예) 한예종 피아노과 출신. 기초부터 연주회 준비까지 맞춤 지도합니다."
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className={INPUT_BASE}
+            maxLength={100}
+          />
+        </InputRow>
+        <InputRow label="학생들에게 보여질 상세한 자기소개를 작성하세요.">
+          <textarea
+            rows={5}
+            placeholder="예) 안녕하세요! 학생 개개인의 속도와 성향에 맞추어 즐겁고 탄탄한 기본기를 길러드립니다. 클래식 입시부터 취미 연주까지 친절하게 지도합니다."
+            value={intro}
+            onChange={(e) => setIntro(e.target.value)}
+            className={`${INPUT_BASE} resize-none leading-relaxed`}
+          />
+        </InputRow>
       </SectionCard>
 
       {/* 저장 */}
