@@ -1,9 +1,8 @@
 "use client";
-import { useState } from "react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ChevronRight, ChevronDown } from "lucide-react";
-import { TUTORS } from "./data/mockData";
+import { CATEGORIES, TUTORS } from "./data/mockData";
 import { useCategoriesQuery } from "./hooks/queries/useCategories";
 import TutorCard from "./components/TutorCard";
 
@@ -12,12 +11,29 @@ const PAGE_SIZE = 4;
 export default function HomePage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [tutorPage, setTutorPage] = useState(1);
+  const [popularCategory, setPopularCategory] = useState("전체");
+  const [latestCategory, setLatestCategory] = useState("전체");
 
   const { data: categories, isLoading: isCategoriesLoading } = useCategoriesQuery();
+  const isLoggedIn = typeof window !== 'undefined' ? !!localStorage.getItem('tm_token') : false;
 
-  const visibleTutors = TUTORS.slice(0, tutorPage * PAGE_SIZE);
-  const hasMore = visibleTutors.length < TUTORS.length;
+  const categoryOptions = useMemo(() => {
+    const options = categories?.map((category) => category.description) ?? CATEGORIES.map((category) => category.label);
+    return ["전체", ...options];
+  }, [categories]);
+
+  const popularTutors = useMemo(() => [...TUTORS].sort((a, b) => b.rating - a.rating), []);
+  const latestTutors = useMemo(() => [...TUTORS].sort((a, b) => b.id - a.id), []);
+
+  const popularFilteredTutors = useMemo(() => {
+    if (popularCategory === "전체") return popularTutors;
+    return popularTutors.filter((tutor) => tutor.subject.toLowerCase().includes(popularCategory.toLowerCase()));
+  }, [popularCategory, popularTutors]);
+
+  const latestFilteredTutors = useMemo(() => {
+    if (latestCategory === "전체") return latestTutors;
+    return latestTutors.filter((tutor) => tutor.subject.toLowerCase().includes(latestCategory.toLowerCase()));
+  }, [latestCategory, latestTutors]);
 
   return (
     <div className="space-y-12">
@@ -94,49 +110,120 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 추천 튜터 */}
-      <section>
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-foreground">추천 튜터</h2>
-          <button
-            onClick={() => router.push("/tutors")}
-            className="flex items-center gap-0.5 text-sm font-medium text-accent hover:underline cursor-pointer"
-          >
-            전체 보기 <ChevronRight size={14} />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {visibleTutors.map((tutor) => (
-            <TutorCard key={tutor.id} tutor={tutor} onClick={() => router.push(`/tutors/${tutor.id}`)} />
-          ))}
-        </div>
-
-        {/* Load more / collapse */}
-        <div className="flex justify-center mt-5">
-          {hasMore ? (
+      <div className="space-y-12">
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-foreground">최고 인기 튜터</h2>
             <button
-              onClick={() => setTutorPage((p) => p + 1)}
-              className="flex flex-col items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer group"
+              onClick={() => router.push("/tutors")}
+              className="flex items-center gap-0.5 text-sm font-medium text-accent hover:underline cursor-pointer"
             >
-              <span className="text-xs font-medium">튜터 더 보기</span>
-              <span className="w-8 h-8 rounded-full border border-border flex items-center justify-center group-hover:border-primary/40 group-hover:bg-secondary transition-all">
-                <ChevronDown size={16} />
-              </span>
+              전체 보기 <ChevronRight size={14} />
             </button>
+          </div>
+          <p className="mb-5 text-sm text-muted-foreground">최근 15일간 매칭과 평점이 높았던 인기 선생님들이에요</p>
+
+          <div className="flex flex-wrap gap-2 mb-5">
+            {categoryOptions.map((category) => {
+              const isSelected = popularCategory === category;
+              return (
+                <button
+                  key={`popular-${category}`}
+                  type="button"
+                  onClick={() => setPopularCategory(category)}
+                  className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-all cursor-pointer ${
+                    isSelected
+                      ? "border-orange-500 bg-orange-500 text-white shadow-sm"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  }`}
+                >
+                  {category}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {popularFilteredTutors.slice(0, 4).map((tutor) => (
+              <TutorCard key={`popular-${tutor.id}`} tutor={tutor} onClick={() => router.push(`/tutors/${tutor.id}`)} />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-foreground">최신 등록 튜터</h2>
+            <button
+              onClick={() => router.push("/tutors")}
+              className="flex items-center gap-0.5 text-sm font-medium text-accent hover:underline cursor-pointer"
+            >
+              전체 보기 <ChevronRight size={14} />
+            </button>
+          </div>
+          <p className="mb-5 text-sm text-muted-foreground">최근 15일간 새롭게 합류한 선생님들을 만나보세요</p>
+
+          <div className="flex flex-wrap gap-2 mb-5">
+            {categoryOptions.map((category) => {
+              const isSelected = latestCategory === category;
+              return (
+                <button
+                  key={`latest-${category}`}
+                  type="button"
+                  onClick={() => setLatestCategory(category)}
+                  className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-all cursor-pointer ${
+                    isSelected
+                      ? "border-orange-500 bg-orange-500 text-white shadow-sm"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  }`}
+                >
+                  {category}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {latestFilteredTutors.slice(0, 4).map((tutor) => (
+              <TutorCard key={`latest-${tutor.id}`} tutor={tutor} onClick={() => router.push(`/tutors/${tutor.id}`)} />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-foreground">AI 추천 튜터</h2>
+          </div>
+          <p className="mb-5 text-sm text-muted-foreground">작성하신 프로필을 바탕으로 적합한 선생님들을 추천해 드려요</p>
+
+          {!isLoggedIn ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card px-5 py-5 text-sm text-muted-foreground">
+              <div className="flex items-center justify-between gap-4">
+                <span>AI 추천을 위해 프로필을 작성해 주세요.</span>
+                <button
+                  type="button"
+                  onClick={() => router.push("/student-profile")}
+                  className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                >
+                  내 프로필로 이동
+                </button>
+              </div>
+            </div>
           ) : (
-            <button
-              onClick={() => setTutorPage(1)}
-              className="flex flex-col items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer group"
-            >
-              <span className="w-8 h-8 rounded-full border border-border flex items-center justify-center group-hover:border-primary/40 group-hover:bg-secondary transition-all rotate-180">
-                <ChevronDown size={16} />
-              </span>
-              <span className="text-xs font-medium">접기</span>
-            </button>
+            <div className="rounded-2xl border border-dashed border-border bg-card px-5 py-5 text-sm text-muted-foreground">
+              <div className="flex items-center justify-between gap-4">
+                <span>로그인된 상태입니다. 프로필을 확인하고 맞춤 추천을 받아보세요.</span>
+                <button
+                  type="button"
+                  onClick={() => router.push("/student-profile")}
+                  className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                >
+                  내 프로필 이동
+                </button>
+              </div>
+            </div>
           )}
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
