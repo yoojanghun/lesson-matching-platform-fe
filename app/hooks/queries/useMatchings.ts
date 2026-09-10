@@ -11,6 +11,7 @@ interface MatchingPage<T> {
 
 interface StudentMatchingResponse {
   matchingId: number;
+  tutorId: number;
   tutorName: string;
   subject?: string[];
   requestMsg: string;

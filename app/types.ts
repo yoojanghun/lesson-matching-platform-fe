@@ -86,6 +86,7 @@ export interface Review {
 
 export interface StudentMatching {
   id: number;
+  tutorId?: number;
   tutor: string;
   subject: string;
   date: string;

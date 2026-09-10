@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Star, MapPin, Video, Clock, CheckCircle2 } from "lucide-react";
 import { TUTORS } from "../data/mockData";
-import { useUser } from "../components/UserContext";
+import type { StudentMatching } from "../types";
+import { useCreateBookingMutation } from "../hooks/queries/useBookings";
 
 interface Props {
   matchingId: number;
+  matching: StudentMatching;
   onBack: () => void;
   onConfirm: () => void;
 }
@@ -61,17 +63,8 @@ function buildCalendar(year: number, month: number) {
   return cells;
 }
 
-export default function BookingPage({ matchingId, onBack, onConfirm }: Props) {
-  const { matchings, addBooking } = useUser();
-  const matching = matchings.find((m) => m.id === matchingId) ?? matchings[0] ?? {
-    id: 1,
-    tutor: "박민준",
-    subject: "기타 · 우쿨렐레",
-    date: "2026-07-01",
-    time: "평일 저녁 7시",
-    status: "accepted" as const,
-    message: "레슨 신청합니다.",
-  };
+export default function BookingPage({ matchingId, matching, onBack, onConfirm }: Props) {
+  const createBookingMutation = useCreateBookingMutation();
 
   const tutor = TUTORS.find((t) => t.name === matching.tutor) ?? TUTORS[0];
 
@@ -125,25 +118,26 @@ export default function BookingPage({ matchingId, onBack, onConfirm }: Props) {
 
     const pad = (n: number) => String(n).padStart(2, "0");
     const dateStr = `${calYear}-${pad(calMonth + 1)}-${pad(selectedDay)}`;
-    const dow = WEEKDAYS[new Date(calYear, calMonth, selectedDay).getDay()];
+    const dayOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][
+      new Date(calYear, calMonth, selectedDay).getDay()
+    ];
     const endTime = addHour(selectedTime);
 
-    addBooking({
-      tutor: tutor.name,
-      subject: tutor.subject,
-      avatar: tutor.avatar,
-      lessonDate: dateStr,
-      lessonDay: dow,
+    if (!matching.tutorId) return;
+    createBookingMutation.mutate({
+      matchingId,
+      tutorId: matching.tutorId,
+      date: dateStr,
+      requestMsg: matching.message,
+      dayOfWeek,
       startTime: selectedTime,
-      endTime: endTime,
-      price: tutor.price,
-      status: "pending",
+      endTime,
+    }, {
+      onSuccess: () => {
+        setConfirmed(true);
+        setTimeout(() => onConfirm(), 1800);
+      },
     });
-
-    setConfirmed(true);
-    setTimeout(() => {
-      onConfirm();
-    }, 1800);
   };
 
   const monthLabel = `${calYear}년 ${calMonth + 1}월`;
@@ -441,6 +435,7 @@ export default function BookingPage({ matchingId, onBack, onConfirm }: Props) {
           </div>
           <button
             onClick={handleConfirm}
+            disabled={createBookingMutation.isPending || !matching.tutorId}
             className="w-full py-3 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/90 transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-sm"
           >
             <CheckCircle2 size={15} /> 예약 신청하기

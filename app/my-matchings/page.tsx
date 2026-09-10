@@ -27,6 +27,7 @@ import { useUserStore } from "../store/useUserStore";
 import { useMatchingsQuery } from "../hooks/queries/useMatchings";
 import { useSetMatchingPriceMutation, useUpdateMatchingStatusMutation } from "../hooks/queries/useMatchings";
 import { useBookingsQuery } from "../hooks/queries/useBookings";
+import { useUpdateReservationStatusMutation } from "../hooks/queries/useBookings";
 import { usePaymentsQuery, usePayItemMutation, usePayAllMutation } from "../hooks/queries/usePayments";
 import LoginGate from "../components/LoginGate";
 import BookingPage from "./BookingPage";
@@ -98,24 +99,24 @@ const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
 
 export default function MyMatchingsPage() {
   const role = useUserStore((s) => s.role);
+  const isTutor = role === "TUTOR";
   const { data: matchingsData } = useMatchingsQuery(
     role === "TUTOR" ? "TUTOR" : "STUDENT",
     role !== "GUEST",
   );
-  const { data: bookingsData } = useBookingsQuery();
+  const { data: bookingsData } = useBookingsQuery(isTutor ? "TUTOR" : "STUDENT");
   const { data: paymentsData } = usePaymentsQuery();
   const payItemMutation = usePayItemMutation();
   const payAllMutation = usePayAllMutation();
   const updateMatchingStatusMutation = useUpdateMatchingStatusMutation();
   const setMatchingPriceMutation = useSetMatchingPriceMutation();
+  const updateReservationStatusMutation = useUpdateReservationStatusMutation();
 
   const matchings: StudentMatching[] = (matchingsData as StudentMatching[]) ?? [];
   const bookings = bookingsData ?? [];
   const payments = paymentsData ?? [];
   const payItem = (id: number) => payItemMutation.mutate(id);
   const payAllUnpaid = () => payAllMutation.mutate();
-
-  const isTutor = role === "TUTOR";
 
   const todayStr = (() => {
     const t = new Date();
@@ -144,9 +145,21 @@ export default function MyMatchingsPage() {
     useState<TutorMatching | null>(null);
 
   // 튜터 수업 예약 요청 목록
-  const [lessonRequests, setLessonRequests] = useState<TutorLessonRequest[]>(
-    TUTOR_LESSON_REQUESTS
-  );
+  const lessonRequests: TutorLessonRequest[] = isTutor
+    ? bookings.map((booking) => ({
+        id: booking.id,
+        student: booking.tutor,
+        subject: booking.subject,
+        lessonDate: booking.lessonDate,
+        lessonDay: booking.lessonDay,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        price: booking.price,
+        status: booking.status === "confirmed" ? "confirmed" : booking.status === "rejected" ? "rejected" : "pending",
+        requestedAt: booking.requestedAt,
+        message: "예약 요청",
+      }))
+    : TUTOR_LESSON_REQUESTS;
   const [lessonReqSelDate, setLessonReqSelDate] = useState<string | null>(
     todayStr
   );
@@ -221,9 +234,13 @@ export default function MyMatchingsPage() {
   }
 
   if (bookingMatchingId !== null) {
+    const bookingMatching = sentMatchings.find((matching) => matching.id === bookingMatchingId);
+    if (!bookingMatching) return null;
+
     return (
       <BookingPage
         matchingId={bookingMatchingId}
+        matching={bookingMatching}
         onBack={() => setBookingMatchingId(null)}
         onConfirm={() => {
           setBookingMatchingId(null);
@@ -1087,15 +1104,11 @@ export default function MyMatchingsPage() {
           }}
           onClose={() => setLessonReqModal(null)}
           onApprove={(id) => {
-            setLessonRequests((prev) =>
-              prev.map((r) => (r.id === id ? { ...r, status: "confirmed" } : r))
-            );
+            updateReservationStatusMutation.mutate({ reservationId: id, status: "confirmed" });
             setLessonReqModal(null);
           }}
           onReject={(id) => {
-            setLessonRequests((prev) =>
-              prev.map((r) => (r.id === id ? { ...r, status: "rejected" } : r))
-            );
+            updateReservationStatusMutation.mutate({ reservationId: id, status: "rejected" });
             setLessonReqModal(null);
           }}
         />
