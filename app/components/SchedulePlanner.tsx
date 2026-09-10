@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { RotateCcw, Copy, CheckCircle2, Clock } from "lucide-react";
+import { useUserStore } from "../store/useUserStore";
+import { useSaveWeeklyScheduleMutation, useTutorScheduleQuery } from "../hooks/queries/useSchedules";
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 type Day = typeof DAYS[number];
@@ -12,6 +14,16 @@ const END_HOUR = 23;
 const TOTAL_SLOTS = (END_HOUR - START_HOUR) * 2; // 32
 const CELL_W = 22; // px per slot
 const GRID_W = TOTAL_SLOTS * CELL_W; // 704px
+const DAY_TO_API: Record<Day, string> = {
+  월: "MONDAY",
+  화: "TUESDAY",
+  수: "WEDNESDAY",
+  목: "THURSDAY",
+  금: "FRIDAY",
+  토: "SATURDAY",
+  일: "SUNDAY",
+};
+const API_TO_DAY = Object.fromEntries(Object.entries(DAY_TO_API).map(([day, value]) => [value, day])) as Record<string, Day>;
 
 type WeekSlots = Record<Day, Set<number>>;
 
@@ -45,11 +57,35 @@ function formatRanges(slots: Set<number>): string {
 }
 
 export default function SchedulePlanner() {
+  const role = useUserStore((state) => state.role);
+  const userId = useUserStore((state) => state.userId);
+  const scheduleQuery = useTutorScheduleQuery(role === "TUTOR" ? userId ?? undefined : undefined);
+  const saveWeeklyScheduleMutation = useSaveWeeklyScheduleMutation(userId ?? undefined);
   const [week, setWeek] = useState<WeekSlots>(makeEmpty);
   const [saved, setSaved] = useState(false);
+  const hydratedRef = useRef(false);
 
   const baseRef = useRef<WeekSlots | null>(null);
   const dragRef = useRef<{ day: Day; start: number; mode: "on" | "off" } | null>(null);
+
+  useEffect(() => {
+    if (!scheduleQuery.data || hydratedRef.current) return;
+    hydratedRef.current = true;
+    const nextWeek = makeEmpty();
+
+    scheduleQuery.data.weeklySchedules.forEach((schedule) => {
+      const day = API_TO_DAY[schedule.dayOfWeek];
+      if (!day) return;
+      const [startHour, startMinute] = schedule.startTime.slice(0, 5).split(":").map(Number);
+      const [endHour, endMinute] = schedule.endTime.slice(0, 5).split(":").map(Number);
+      const startSlot = ((startHour * 60 + startMinute) - START_HOUR * 60) / 30;
+      const endSlot = ((endHour * 60 + endMinute) - START_HOUR * 60) / 30;
+      for (let slot = startSlot; slot < endSlot; slot += 1) nextWeek[day].add(slot);
+    });
+
+    const timer = window.setTimeout(() => setWeek(nextWeek), 0);
+    return () => window.clearTimeout(timer);
+  }, [scheduleQuery.data]);
 
   useEffect(() => {
     const up = () => {
@@ -66,7 +102,11 @@ export default function SchedulePlanner() {
     dragRef.current = { day, start: slot, mode };
     setWeek((prev) => {
       const s = new Set(prev[day]);
-      mode === "on" ? s.add(slot) : s.delete(slot);
+      if (mode === "on") {
+        s.add(slot);
+      } else {
+        s.delete(slot);
+      }
       return { ...prev, [day]: s };
     });
   };
@@ -78,7 +118,13 @@ export default function SchedulePlanner() {
     const lo = Math.min(d.start, slot);
     const hi = Math.max(d.start, slot);
     const s = new Set(b[day]);
-    for (let i = lo; i <= hi; i++) d.mode === "on" ? s.add(i) : s.delete(i);
+    for (let i = lo; i <= hi; i++) {
+      if (d.mode === "on") {
+        s.add(i);
+      } else {
+        s.delete(i);
+      }
+    }
     setWeek((prev) => ({ ...prev, [day]: s }));
   };
 
@@ -92,8 +138,37 @@ export default function SchedulePlanner() {
   };
 
   const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    const request = DAYS.flatMap((day) => {
+      const slots = [...week[day]].sort((a, b) => a - b);
+      if (!slots.length) return [];
+
+      const ranges: Array<{ start: number; end: number }> = [];
+      let start = slots[0];
+      let previous = slots[0];
+      slots.slice(1).forEach((slot) => {
+        if (slot === previous + 1) {
+          previous = slot;
+          return;
+        }
+        ranges.push({ start, end: previous + 1 });
+        start = slot;
+        previous = slot;
+      });
+      ranges.push({ start, end: previous + 1 });
+
+      return ranges.map((range) => ({
+        dayOfWeek: DAY_TO_API[day],
+        startTime: slotTime(range.start),
+        endTime: slotTime(range.end),
+      }));
+    });
+
+    saveWeeklyScheduleMutation.mutate(request, {
+      onSuccess: () => {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      },
+    });
   };
 
   const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
@@ -249,6 +324,7 @@ export default function SchedulePlanner() {
         </div>
         <button
           onClick={handleSave}
+          disabled={saveWeeklyScheduleMutation.isPending || role !== "TUTOR"}
           className={`flex items-center gap-2 px-7 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer shadow-sm ${
             saved
               ? "bg-emerald-500 text-white"
