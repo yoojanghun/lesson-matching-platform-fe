@@ -5,13 +5,15 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Send } from 'lucide-react';
 import { TUTORS } from '../../data/mockData';
 import { useUser } from '../../components/UserContext';
+import { useCreateMatchingMutation } from '../../hooks/queries/useMatchings';
 
 export default function MatchingRequestPage() {
   const router = useRouter();
   const params = useParams();
   const tutorId = Number(params.tutorId);
   const tutor = TUTORS.find((t) => t.id === tutorId) ?? TUTORS[0];
-  const { addMatching, role } = useUser();
+  const { role } = useUser();
+  const createMatchingMutation = useCreateMatchingMutation();
 
   const [preferredSchedule, setPreferredSchedule] = useState('');
   const [goal, setGoal] = useState('');
@@ -27,8 +29,14 @@ export default function MatchingRequestPage() {
       .filter(Boolean)
       .join(' / ');
 
-    addMatching(tutor.id, fullMessage, preferredSchedule || '주말/평일 조율');
-    router.push('/my-matchings');
+    createMatchingMutation.mutate(
+      {
+        tutorId: tutor.id,
+        message: fullMessage,
+        schedule: preferredSchedule || '주말/평일 조율',
+      },
+      { onSuccess: () => router.push('/my-matchings') },
+    );
   };
 
   return (
@@ -108,6 +116,7 @@ export default function MatchingRequestPage() {
 
         <button
           type="submit"
+          disabled={createMatchingMutation.isPending || role !== 'STUDENT'}
           className="w-full py-3 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
         >
           <Send size={15} /> 매칭 요청 보내기

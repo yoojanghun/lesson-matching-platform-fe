@@ -12,7 +12,6 @@ import {
   Clock,
 } from "lucide-react";
 import {
-  MY_MATCHINGS_TUTOR,
   TUTOR_LESSON_REQUESTS,
   TUTORS,
 } from "../data/mockData";
@@ -26,6 +25,7 @@ import type {
 import StatusBadge from "../components/StatusBadge";
 import { useUserStore } from "../store/useUserStore";
 import { useMatchingsQuery } from "../hooks/queries/useMatchings";
+import { useSetMatchingPriceMutation, useUpdateMatchingStatusMutation } from "../hooks/queries/useMatchings";
 import { useBookingsQuery } from "../hooks/queries/useBookings";
 import { usePaymentsQuery, usePayItemMutation, usePayAllMutation } from "../hooks/queries/usePayments";
 import LoginGate from "../components/LoginGate";
@@ -98,11 +98,16 @@ const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
 
 export default function MyMatchingsPage() {
   const role = useUserStore((s) => s.role);
-  const { data: matchingsData } = useMatchingsQuery(role === "TUTOR" ? "TUTOR" : "STUDENT");
+  const { data: matchingsData } = useMatchingsQuery(
+    role === "TUTOR" ? "TUTOR" : "STUDENT",
+    role !== "GUEST",
+  );
   const { data: bookingsData } = useBookingsQuery();
   const { data: paymentsData } = usePaymentsQuery();
   const payItemMutation = usePayItemMutation();
   const payAllMutation = usePayAllMutation();
+  const updateMatchingStatusMutation = useUpdateMatchingStatusMutation();
+  const setMatchingPriceMutation = useSetMatchingPriceMutation();
 
   const matchings: StudentMatching[] = (matchingsData as StudentMatching[]) ?? [];
   const bookings = bookingsData ?? [];
@@ -128,9 +133,7 @@ export default function MyMatchingsPage() {
   >("received");
 
   // 튜터 매칭 목록 (레슨비 커스텀 지원)
-  const [tutorMatchingsList, setTutorMatchingsList] = useState<TutorMatching[]>(
-    MY_MATCHINGS_TUTOR.map((m) => ({ ...m, lessonFee: undefined }))
-  );
+  const tutorMatchings = (matchingsData as TutorMatching[]) ?? [];
   const [selectedTutorMatchingId, setSelectedTutorMatchingId] = useState<
     number | null
   >(null);
@@ -162,7 +165,6 @@ export default function MyMatchingsPage() {
   const [paymentPopup, setPaymentPopup] = useState<string | null>(null);
 
   const sentMatchings = matchings;
-  const tutorMatchings = tutorMatchingsList;
   const lessonBookings = bookings;
   const unpaidCount = payments.filter((p) => p.status === "unpaid").length;
   const unpaidTotal = payments
@@ -202,7 +204,7 @@ export default function MyMatchingsPage() {
 
   // 학생 상세 화면 진입 시
   if (selectedTutorMatchingId !== null) {
-    const matching = tutorMatchingsList.find(
+    const matching = tutorMatchings.find(
       (m) => m.id === selectedTutorMatchingId
     );
     if (matching) {
@@ -211,9 +213,7 @@ export default function MyMatchingsPage() {
           matching={matching}
           onBack={() => setSelectedTutorMatchingId(null)}
           onUpdateFee={(id, fee) => {
-            setTutorMatchingsList((prev) =>
-              prev.map((m) => (m.id === id ? { ...m, lessonFee: fee } : m))
-            );
+            setMatchingPriceMutation.mutate({ id, pricePerLesson: fee });
           }}
         />
       );
@@ -1052,9 +1052,7 @@ export default function MyMatchingsPage() {
           defaultFee={TUTORS[0].price}
           onClose={() => setFeeModalTarget(null)}
           onSave={(id, fee) => {
-            setTutorMatchingsList((prev) =>
-              prev.map((m) => (m.id === id ? { ...m, lessonFee: fee } : m))
-            );
+            setMatchingPriceMutation.mutate({ id, pricePerLesson: fee });
             setFeeModalTarget(null);
           }}
         />
@@ -1066,15 +1064,11 @@ export default function MyMatchingsPage() {
           matching={approveModalTarget}
           onClose={() => setApproveModalTarget(null)}
           onApprove={(id) => {
-            setTutorMatchingsList((prev) =>
-              prev.map((m) => (m.id === id ? { ...m, status: "accepted" } : m))
-            );
+            updateMatchingStatusMutation.mutate({ id, status: "accepted" });
             setApproveModalTarget(null);
           }}
           onReject={(id) => {
-            setTutorMatchingsList((prev) =>
-              prev.map((m) => (m.id === id ? { ...m, status: "rejected" } : m))
-            );
+            updateMatchingStatusMutation.mutate({ id, status: "rejected" });
             setApproveModalTarget(null);
           }}
         />
