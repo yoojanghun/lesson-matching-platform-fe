@@ -309,7 +309,8 @@ export default function StudentProfilePage() {
       locationIds: references?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
       introduction: memo,
       lessonType: lessonType ? LESSON_TYPE_API_VALUES[lessonType] : undefined,
-      budgetTypes: normalizedBudget,
+      minBudget: budgetMin,
+      maxBudget: budgetMax,
     }, {
       onSuccess: () => {
         saveStudentProfile(profileData);

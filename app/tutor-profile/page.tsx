@@ -291,6 +291,7 @@ export default function TutorProfilePage() {
       intro,
     };
     saveProfileMutation.mutate({
+      name: name || undefined,
       title: title || undefined,
       email: email || undefined,
       phoneNumber: phoneNumber || undefined,
@@ -301,10 +302,14 @@ export default function TutorProfilePage() {
       categoryIds: categories?.filter((category) => subjects.includes(category.description)).map((category) => category.categoryId),
       subjectIds: categories?.filter((category) => subjects.includes(category.description)).flatMap((category) => category.subjects.map((subject) => subject.subjectId)),
       styleIds: references?.tutorStyles.filter((style) => teachStyles.includes(style.description)).map((style) => style.id),
+      goalIds: references?.lessonGoals.filter((goal) => goals.includes(goal.description ?? '')).map((goal) => goal.goalId),
       locationIds: references?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
-      career: careers.filter((career) => career.text.trim()).map((career) => career.text.trim()).join('\n'),
-      content: teachNote,
-      introduction: intro,
+      experiences: careers.filter((career) => career.text.trim()).map((career) => career.text.trim()),
+      educations: educations.filter((education) => education.text.trim()).map((education) => education.text.trim()),
+      prices: fees
+        .filter((fee) => fee.type.trim() && fee.price.trim())
+        .map((fee) => ({ className: fee.type.trim(), price: Number(fee.price.replace(/,/g, '')) || 0 })),
+      introduction: intro || undefined,
     }, {
       onSuccess: () => {
         saveTutorProfile(profileData);

@@ -62,7 +62,7 @@ export interface TutorProfileResponse {
   styles: ProfileTypeDto[];
 }
 
-export interface StudentProfileRequest {
+export interface StudentProfilePatchRequest {
   phoneNumber?: string;
   styleIds?: number[];
   categoryIds?: number[];
@@ -70,10 +70,12 @@ export interface StudentProfileRequest {
   locationIds?: number[];
   introduction?: string;
   lessonType?: string;
-  budgetTypes?: string[];
+  minBudget?: number;
+  maxBudget?: number;
 }
 
-export interface TutorProfileRequest {
+export interface TutorProfilePatchRequest {
+  name?: string;
   phoneNumber?: string;
   email?: string;
   birthDate?: string;
@@ -84,9 +86,11 @@ export interface TutorProfileRequest {
   categoryIds?: number[];
   subjectIds?: number[];
   locationIds?: number[];
+  goalIds?: number[];
   title?: string;
-  career?: string;
-  content?: string;
+  experiences?: string[];
+  educations?: string[];
+  prices?: Array<{ className: string; price: number }>;
   introduction?: string;
 }
 
@@ -110,8 +114,8 @@ export function useSaveStudentProfileMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (request: StudentProfileRequest) =>
-      apiClient.put('/api/profile/student/me', request).then(() => request),
+    mutationFn: (request: StudentProfilePatchRequest) =>
+      apiClient.patch('/api/profile/student/me', request).then(() => request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.profiles.student });
     },
@@ -122,8 +126,8 @@ export function useSaveTutorProfileMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (request: TutorProfileRequest) =>
-      apiClient.put('/api/profile/tutor/me', request).then(() => request),
+    mutationFn: (request: TutorProfilePatchRequest) =>
+      apiClient.patch('/api/profile/tutor/me', request).then(() => request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.profiles.tutor });
     },
