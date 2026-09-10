@@ -5,6 +5,27 @@ import { useSearchParams } from "next/navigation";
 import { Send, ArrowLeft, Search, MoreVertical, MessageSquare } from "lucide-react";
 import { TUTORS } from "../data/mockData";
 import type { Conversation, ChatMessage } from "../types";
+import { Client, type IMessage } from "@stomp/stompjs";
+import SockJS from "sockjs-client";
+import { apiClient } from "../lib/apiClient";
+import { useUserStore } from "../store/useUserStore";
+
+interface ChatMessageDto {
+  mongoId?: string;
+  type: "ENTER" | "TALK" | "LEAVE";
+  matchingId?: number | null;
+  studentId: number;
+  tutorId: number;
+  senderId?: number | null;
+  senderName?: string | null;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+interface ChatHistoryResponse {
+  content: ChatMessageDto[];
+}
 
 const INITIAL_CONVERSATIONS: Conversation[] = [
   {
@@ -99,6 +120,7 @@ function lastMsg(conv: Conversation) {
 function ChatListContent() {
   const searchParams = useSearchParams();
   const targetTutorId = searchParams.get("tutorId") ? Number(searchParams.get("tutorId")) : null;
+  const userId = useUserStore((state) => state.userId);
 
   const [convs, setConvs] = useState<Conversation[]>(INITIAL_CONVERSATIONS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -107,41 +129,42 @@ function ChatListContent() {
   const [search, setSearch] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const stompClientRef = useRef<Client | null>(null);
+  const initializedTargetTutorRef = useRef<number | null>(null);
 
   // If query tutorId is present, auto open or create conversation with that tutor
   useEffect(() => {
-    if (targetTutorId) {
-      const existing = convs.find((c) => c.tutorId === targetTutorId);
-      if (existing) {
-        setSelectedId(existing.id);
-      } else {
-        const tutor = TUTORS.find((t) => t.id === targetTutorId);
-        if (tutor) {
-          const newConv: Conversation = {
-            id: createConversationId(),
-            tutorId: tutor.id,
-            tutorName: tutor.name,
-            tutorAvatar: tutor.avatar,
-            tutorSubject: tutor.subject,
-            online: tutor.available,
-            unread: 0,
-            messages: [
-              {
-                id: 1,
-                from: "tutor",
-                text: `안녕하세요! ${tutor.name} 튜터입니다. 궁금한 점이 있으시면 말씀해 주세요 😊`,
-                time: nowTime(),
-              },
-            ],
-          };
-          setConvs((prev) => [newConv, ...prev]);
-          setSelectedId(newConv.id);
-        }
-      }
-    }
-  }, [targetTutorId]);
+    if (!targetTutorId || initializedTargetTutorRef.current === targetTutorId) return;
+    initializedTargetTutorRef.current = targetTutorId;
+
+    const existing = convs.find((c) => c.tutorId === targetTutorId);
+    const tutor = TUTORS.find((t) => t.id === targetTutorId);
+    const conversation = existing ?? (tutor ? {
+      id: createConversationId(),
+      tutorId: tutor.id,
+      tutorName: tutor.name,
+      tutorAvatar: tutor.avatar,
+      tutorSubject: tutor.subject,
+      online: tutor.available,
+      unread: 0,
+      messages: [{
+        id: 1,
+        from: "tutor" as const,
+        text: `안녕하세요! ${tutor.name} 튜터입니다. 궁금한 점이 있으시면 말씀해 주세요 😊`,
+        time: nowTime(),
+      }],
+    } : null);
+
+    if (!conversation) return;
+    const timer = window.setTimeout(() => {
+      if (!existing) setConvs((prev) => [conversation, ...prev]);
+      setSelectedId(conversation.id);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [convs, targetTutorId]);
 
   const selected = convs.find((c) => c.id === selectedId) ?? null;
+  const selectedTutorId = selected?.tutorId ?? null;
   const filtered = convs.filter(
     (c) =>
       c.tutorName.toLowerCase().includes(search.toLowerCase()) ||
@@ -156,6 +179,81 @@ function ChatListContent() {
     if (selectedId) inputRef.current?.focus();
   }, [selectedId]);
 
+  useEffect(() => {
+    if (!selectedTutorId || !userId) return;
+
+    let cancelled = false;
+    const loadHistory = async () => {
+      try {
+        const response = await apiClient.get<ChatHistoryResponse>("/api/chat/history", {
+          params: { studentId: userId, tutorId: selectedTutorId, page: 0, size: 50 },
+        });
+        if (cancelled) return;
+
+        const messages: ChatMessage[] = [...response.data.content].reverse().map((message, index) => ({
+          id: index + 1,
+          from: message.senderId === userId ? "me" : "tutor",
+          text: message.message,
+          time: new Date(message.createdAt).toLocaleTimeString("ko-KR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        }));
+        setConvs((prev) => prev.map((conversation) => (
+          conversation.id === selectedId ? { ...conversation, messages, unread: 0 } : conversation
+        )));
+        await apiClient.post("/api/chat/read", { matchingId: null, studentId: userId, tutorId: selectedTutorId });
+      } catch (error) {
+        console.error("채팅 내역 조회 실패", error);
+      }
+    };
+
+    void loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, selectedTutorId, userId]);
+
+  useEffect(() => {
+    if (!selectedTutorId || !userId) return;
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+    const client = new Client({
+      webSocketFactory: () => new SockJS(`${baseUrl}/ws-chat`),
+      connectHeaders: {
+        Authorization: `Bearer ${localStorage.getItem("tm_token") ?? ""}`,
+      },
+      reconnectDelay: 5000,
+      onConnect: () => {
+        client.subscribe(`/topic/chat:room:inquiry/${userId}/${selectedTutorId}`, (frame: IMessage) => {
+          const message = JSON.parse(frame.body) as ChatMessageDto;
+          const incoming: ChatMessage = {
+            id: Date.now(),
+            from: message.senderId === userId ? "me" : "tutor",
+            text: message.message,
+            time: new Date(message.createdAt).toLocaleTimeString("ko-KR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          };
+          setConvs((prev) => prev.map((conversation) => (
+            conversation.id === selectedId
+              ? { ...conversation, messages: [...conversation.messages, incoming] }
+              : conversation
+          )));
+        });
+      },
+      onStompError: (frame) => console.error("채팅 WebSocket 오류", frame.headers["message"]),
+    });
+
+    stompClientRef.current = client;
+    client.activate();
+    return () => {
+      stompClientRef.current = null;
+      void client.deactivate();
+    };
+  }, [selectedId, selectedTutorId, userId]);
+
   const selectConv = (id: number) => {
     setSelectedId(id);
     setConvs((prev) => prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c)));
@@ -169,23 +267,30 @@ function ChatListContent() {
       prev.map((c) => (c.id === selectedId ? { ...c, messages: [...c.messages, msg] } : c))
     );
     setInput("");
+
+    if (userId && selectedTutorId && stompClientRef.current?.connected) {
+      stompClientRef.current.publish({
+        destination: "/app/chat/message",
+        body: JSON.stringify({
+          type: "TALK",
+          matchingId: null,
+          studentId: userId,
+          tutorId: selectedTutorId,
+          message: text,
+        }),
+      });
+      return;
+    }
+
     setIsTyping(true);
     setTimeout(() => {
       const reply = AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
       setIsTyping(false);
-      setConvs((prev) =>
-        prev.map((c) =>
-          c.id === selectedId
-            ? {
-                ...c,
-                messages: [
-                  ...c.messages,
-                  { id: nextId++, from: "tutor", text: reply, time: nowTime() },
-                ],
-              }
-            : c
-        )
-      );
+      setConvs((prev) => prev.map((c) => (
+        c.id === selectedId
+          ? { ...c, messages: [...c.messages, { id: nextId++, from: "tutor", text: reply, time: nowTime() }] }
+          : c
+      )));
     }, 1200 + Math.random() * 500);
   };
 

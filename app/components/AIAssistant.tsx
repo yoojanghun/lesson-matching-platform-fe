@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { X, Send, Sparkles, Star, ChevronRight, RotateCcw } from "lucide-react";
 import { TUTORS } from "../data/mockData";
 import type { Tutor } from "../types";
+import { apiClient } from "../lib/apiClient";
 
 type MsgRole = "user" | "ai";
 
@@ -20,6 +21,23 @@ interface AiMessage {
   time: string;
   tutorCards?: TutorCard[];
   quickReplies?: string[];
+}
+
+interface TutorRecommendationProfile {
+  tutorId?: number;
+  name?: string;
+  title?: string | null;
+  introduction?: string | null;
+  locations?: Array<{ name?: string }>;
+  subjects?: Array<{ subjectType?: string }>;
+  prices?: Array<{ price?: number }>;
+}
+
+interface TutorRecommendationResponse {
+  tutorId: number;
+  tutorName: string;
+  recommendationReason: string;
+  profile?: TutorRecommendationProfile | null;
 }
 
 const QUICK_QUESTIONS = [
@@ -177,6 +195,62 @@ function buildAiResponse(query: string): Omit<AiMessage, "id" | "role" | "time">
   };
 }
 
+function isTutorRecommendationQuery(query: string) {
+  const normalizedQuery = query.toLowerCase();
+  return normalizedQuery.includes("추천") && (
+    normalizedQuery.includes("강사") ||
+    normalizedQuery.includes("튜터") ||
+    normalizedQuery.includes("선생님")
+  );
+}
+
+function toTutor(response: TutorRecommendationResponse): Tutor {
+  const profile = response.profile;
+  const fallbackTutor = TUTORS.find((tutor) => tutor.id === response.tutorId);
+  const subjects = profile?.subjects
+    ?.map((subject) => subject.subjectType)
+    .filter((subject): subject is string => Boolean(subject)) ?? [];
+  const locations = profile?.locations
+    ?.map((location) => location.name)
+    .filter((location): location is string => Boolean(location)) ?? [];
+  const price = profile?.prices?.[0]?.price;
+  const intro = profile?.introduction || profile?.title || fallbackTutor?.intro || "맞춤형 레슨을 제공합니다.";
+
+  return {
+    id: response.tutorId,
+    name: response.tutorName || profile?.name || fallbackTutor?.name || "튜터",
+    title: profile?.title || fallbackTutor?.title,
+    subject: subjects.join(" · ") || fallbackTutor?.subject || "음악 레슨",
+    rating: fallbackTutor?.rating ?? 0,
+    reviews: fallbackTutor?.reviews ?? 0,
+    price: price ?? fallbackTutor?.price ?? 0,
+    tags: subjects.length > 0 ? subjects : (fallbackTutor?.tags ?? []),
+    intro,
+    avatar: fallbackTutor?.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&auto=format",
+    available: fallbackTutor?.available ?? true,
+    lessonLocations: locations.length > 0 ? locations : fallbackTutor?.lessonLocations,
+    location: locations[0] || fallbackTutor?.location,
+  };
+}
+
+async function fetchTutorRecommendations(query: string): Promise<Omit<AiMessage, "id" | "role" | "time">> {
+  const response = await apiClient.post<TutorRecommendationResponse[]>("/api/ai/recommend-tutors", {
+    studentRequirement: query,
+  });
+  const recommendations = response.data;
+
+  return {
+    text: recommendations.length > 0
+      ? `**AI 맞춤 강사 추천** 결과입니다.\n\n회원님의 요청을 분석해 ${recommendations.length}명의 강사를 추천해 드렸어요.`
+      : "입력하신 조건에 맞는 강사를 찾지 못했어요. 악기, 목표, 지역 또는 수업 형태를 조금 더 구체적으로 적어 주세요.",
+    tutorCards: recommendations.map((recommendation) => ({
+      tutor: toTutor(recommendation),
+      reason: recommendation.recommendationReason,
+    })),
+    quickReplies: ["초보자 피아노 강사 추천", "온라인 강사 추천", "매칭 신청 방법 알려줘"],
+  };
+}
+
 function RenderText({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
@@ -291,19 +365,31 @@ export default function AIAssistant() {
     if (open) setTimeout(() => inputRef.current?.focus(), 200);
   }, [open]);
 
-  const sendQuery = (query: string) => {
+  const sendQuery = async (query: string) => {
     if (!query.trim() || thinking) return;
     const userMsg: AiMessage = { id: msgId++, role: "user", text: query, time: nowTime() };
     setMessages((p) => [...p, userMsg]);
     setInput("");
     setThinking(true);
 
-    const delay = 800 + Math.random() * 600;
-    setTimeout(() => {
-      const res = buildAiResponse(query);
+    try {
+      const res = isTutorRecommendationQuery(query)
+        ? await fetchTutorRecommendations(query)
+        : buildAiResponse(query);
       setMessages((p) => [...p, { id: msgId++, role: "ai", time: nowTime(), ...res }]);
+    } catch {
+      const fallback = buildAiResponse(query);
+      setMessages((p) => [...p, {
+        id: msgId++,
+        role: "ai",
+        time: nowTime(),
+        text: `${fallback.text}\n\n현재 AI 추천 서버에 연결할 수 없어 기본 추천 결과를 보여드리고 있어요.`,
+        tutorCards: fallback.tutorCards,
+        quickReplies: fallback.quickReplies,
+      }]);
+    } finally {
       setThinking(false);
-    }, delay);
+    }
   };
 
   const reset = () => {

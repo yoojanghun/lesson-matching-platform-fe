@@ -110,15 +110,6 @@ export default function MyMatchingsPage() {
   const payItem = (id: number) => payItemMutation.mutate(id);
   const payAllUnpaid = () => payAllMutation.mutate();
 
-  if (role === "GUEST") {
-    return (
-      <LoginGate
-        title="내 매칭 확인을 위해 로그인이 필요합니다"
-        description="로그인하시면 신청한 매칭 목록, 수업 예약 현황 및 결제 내역을 바로 확인하실 수 있습니다."
-      />
-    );
-  }
-
   const isTutor = role === "TUTOR";
 
   const todayStr = (() => {
@@ -199,6 +190,14 @@ export default function MyMatchingsPage() {
     color: p.status === "paid" ? "green" : "amber",
   }));
 
+  if (role === "GUEST") {
+    return (
+      <LoginGate
+        title="내 매칭 확인을 위해 로그인이 필요합니다"
+        description="로그인하시면 신청한 매칭 목록, 수업 예약 현황 및 결제 내역을 바로 확인하실 수 있습니다."
+      />
+    );
+  }
 
 
   // 학생 상세 화면 진입 시

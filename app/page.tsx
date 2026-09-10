@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Search, ChevronRight, ChevronDown } from "lucide-react";
 import { CATEGORIES, TUTORS } from "./data/mockData";
 import { useCategoriesQuery } from "./hooks/queries/useCategories";
+import { useHydrated } from "./hooks/useHydrated";
 import TutorCard from "./components/TutorCard";
 
 const PAGE_SIZE = 4;
@@ -13,9 +14,10 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [popularCategory, setPopularCategory] = useState("전체");
   const [latestCategory, setLatestCategory] = useState("전체");
+  const hydrated = useHydrated();
 
   const { data: categories, isLoading: isCategoriesLoading } = useCategoriesQuery();
-  const isLoggedIn = typeof window !== 'undefined' ? !!localStorage.getItem('tm_token') : false;
+  const isLoggedIn = hydrated && !!localStorage.getItem("tm_token");
 
   const categoryOptions = useMemo(() => {
     const options = categories?.map((category) => category.description) ?? CATEGORIES.map((category) => category.label);

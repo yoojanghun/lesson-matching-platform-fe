@@ -19,6 +19,7 @@ export const MOCK_ACCOUNTS: TestAccount[] = [
 
 export interface UserState {
   role: Role;
+  userId: number | null;
   userName: string;
   toast: string | null;
   matchings: StudentMatching[];
@@ -35,7 +36,7 @@ export interface UserState {
   quickLogin: (account: TestAccount) => void;
   signup: (role: Role, name: string) => void;
   logout: () => void;
-  setRole: (role: Role, userName?: string) => void;
+  setRole: (role: Role, userName?: string, userId?: number) => void;
   addMatching: (tutorId: number, message: string, schedule: string) => void;
   updateMatchingStatus: (id: number, status: 'accepted' | 'rejected') => void;
   addBooking: (booking: Omit<LessonBooking, 'id' | 'requestedAt'>) => void;
@@ -86,6 +87,7 @@ export const useUserStore = create<UserState>()(
   persist(
     (set, get) => ({
       role: 'GUEST',
+      userId: null,
       userName: '',
       toast: null,
       matchings: MY_MATCHINGS_STUDENT,
@@ -134,12 +136,16 @@ export const useUserStore = create<UserState>()(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('tm_token');
         }
-        set({ role: 'GUEST', userName: '' });
+        set({ role: 'GUEST', userId: null, userName: '' });
         get().showToast('로그아웃되었습니다.');
       },
 
-      setRole: (newRole: Role, newUserName?: string) => {
-        set({ role: newRole, ...(newUserName !== undefined && { userName: newUserName }) });
+      setRole: (newRole: Role, newUserName?: string, newUserId?: number) => {
+        set({
+          role: newRole,
+          ...(newUserName !== undefined && { userName: newUserName }),
+          ...(newUserId !== undefined && { userId: newUserId }),
+        });
       },
 
       addMatching: (tutorId: number, message: string, schedule: string) => {

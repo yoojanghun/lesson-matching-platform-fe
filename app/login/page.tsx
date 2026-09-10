@@ -20,13 +20,14 @@ interface LoginResponse {
 }
 
 /** JWT payload를 서명 검증 없이 디코딩 (클라이언트 전용) */
-function decodeJwtPayload(token: string): { sub: string; roles: string[] } | null {
+function decodeJwtPayload(token: string): { sub: string; roles: string[]; userId?: number } | null {
   try {
     const payloadBase64 = token.split('.')[1];
     const decoded = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
     return {
       sub: decoded.sub ?? '',
       roles: Array.isArray(decoded.roles) ? decoded.roles : [],
+      userId: typeof decoded.userId === 'number' ? decoded.userId : undefined,
     };
   } catch {
     return null;
@@ -62,7 +63,7 @@ export default function LoginPage() {
           role = 'STUDENT';
         }
 
-        setRole(role, payload.sub);
+        setRole(role, payload.sub, payload.userId);
       }
 
       router.push('/');
