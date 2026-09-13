@@ -3,6 +3,17 @@ import { useUserStore } from '../store/useUserStore';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
+const PUBLIC_API_PATHS = [
+  '/api/auth/login',
+  '/api/auth/refresh',
+  '/api/sign-up/',
+  '/api/categories',
+];
+
+function isPublicApiRequest(url?: string) {
+  return Boolean(url && PUBLIC_API_PATHS.some((path) => url === path || url.startsWith(path)));
+}
+
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
@@ -49,11 +60,13 @@ function forceLogout() {
 // Request Interceptor: JWT 토큰 자동 주입
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !isPublicApiRequest(config.url)) {
       const token = localStorage.getItem('tm_token');
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+    } else if (config.headers) {
+      delete config.headers.Authorization;
     }
     return config;
   },
@@ -65,6 +78,10 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
+    if (isPublicApiRequest(originalRequest.url)) {
+      return Promise.reject(error);
+    }
 
     // 401이 아니거나 이미 재시도한 요청은 그냥 reject
     if (error.response?.status !== 401 || originalRequest._retry) {

@@ -36,14 +36,13 @@ const AUTO_REPLIES = [
   "일정 조율해서 편한 시간으로 잡아봐요!",
 ];
 
-let msgId = 10;
-
 export default function ChatPanel({ tutorName, tutorAvatar, tutorSubject, onClose }: Props) {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const msgIdRef = useRef(10);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,7 +56,7 @@ export default function ChatPanel({ tutorName, tutorAvatar, tutorSubject, onClos
     const text = input.trim();
     if (!text) return;
 
-    const myMsg: Message = { id: msgId++, from: "me", text, time: nowTime() };
+    const myMsg: Message = { id: msgIdRef.current++, from: "me", text, time: nowTime() };
     setMessages((prev) => [...prev, myMsg]);
     setInput("");
 
@@ -66,7 +65,7 @@ export default function ChatPanel({ tutorName, tutorAvatar, tutorSubject, onClos
     setTimeout(() => {
       const reply = AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
       setIsTyping(false);
-      setMessages((prev) => [...prev, { id: msgId++, from: "tutor", text: reply, time: nowTime() }]);
+      setMessages((prev) => [...prev, { id: msgIdRef.current++, from: "tutor", text: reply, time: nowTime() }]);
     }, 1200 + Math.random() * 600);
   };
 
