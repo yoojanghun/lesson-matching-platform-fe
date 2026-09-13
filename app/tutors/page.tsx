@@ -150,8 +150,14 @@ function TutorsContent() {
   ];
 
   const removeServiceFilter = () => {
+    if (selectedSubject) {
+      setSelectedSubjectOverride("");
+      return;
+    }
+
     setSelectedCategoryOverride(null);
-    setSelectedSubjectOverride("");
+    setSelectedSubjectOverride(null);
+    router.replace("/tutors", { scroll: false });
   };
 
   const removeRegionFilter = () => {
