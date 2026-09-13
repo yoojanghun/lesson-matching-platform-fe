@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, Send, Sparkles, Star, ChevronRight, RotateCcw } from "lucide-react";
+import Image from "next/image";
 import { TUTORS } from "../data/mockData";
 import type { Tutor } from "../types";
 import { apiClient } from "../lib/apiClient";
@@ -305,7 +306,7 @@ function TutorRecommendCard({
 }) {
   return (
     <div className="bg-card rounded-xl border border-border p-3 flex items-start gap-3 shadow-sm">
-      <img src={tutor.avatar} alt={tutor.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
+      <Image src={tutor.avatar} alt={tutor.name} width={40} height={40} className="w-10 h-10 rounded-full object-cover shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-bold text-foreground">{tutor.name} 튜터</p>
@@ -334,14 +335,13 @@ function TutorRecommendCard({
   );
 }
 
-let msgId = 1;
 function nowTime() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 const WELCOME: AiMessage = {
-  id: msgId++,
+  id: 0,
   role: "ai",
   text: "안녕하세요! 👋 TutorMatch AI 어시스턴트입니다.\n\nRAG 기반으로 강사 데이터베이스와 플랫폼 FAQ를 실시간 검색해 답변해 드립니다.\n\n무엇이든 편하게 물어보세요!",
   time: "10:00",
@@ -356,6 +356,9 @@ export default function AIAssistant() {
   const [thinking, setThinking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const msgIdRef = useRef(1);
+
+  const nextMessageId = () => msgIdRef.current++;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -367,7 +370,7 @@ export default function AIAssistant() {
 
   const sendQuery = async (query: string) => {
     if (!query.trim() || thinking) return;
-    const userMsg: AiMessage = { id: msgId++, role: "user", text: query, time: nowTime() };
+    const userMsg: AiMessage = { id: nextMessageId(), role: "user", text: query, time: nowTime() };
     setMessages((p) => [...p, userMsg]);
     setInput("");
     setThinking(true);
@@ -376,11 +379,11 @@ export default function AIAssistant() {
       const res = isTutorRecommendationQuery(query)
         ? await fetchTutorRecommendations(query)
         : buildAiResponse(query);
-      setMessages((p) => [...p, { id: msgId++, role: "ai", time: nowTime(), ...res }]);
+      setMessages((p) => [...p, { id: nextMessageId(), role: "ai", time: nowTime(), ...res }]);
     } catch {
       const fallback = buildAiResponse(query);
       setMessages((p) => [...p, {
-        id: msgId++,
+        id: nextMessageId(),
         role: "ai",
         time: nowTime(),
         text: `${fallback.text}\n\n현재 AI 추천 서버에 연결할 수 없어 기본 추천 결과를 보여드리고 있어요.`,
@@ -393,7 +396,7 @@ export default function AIAssistant() {
   };
 
   const reset = () => {
-    setMessages([{ ...WELCOME, id: msgId++, time: nowTime() }]);
+    setMessages([{ ...WELCOME, id: nextMessageId(), time: nowTime() }]);
     setInput("");
   };
 
@@ -401,14 +404,14 @@ export default function AIAssistant() {
     <>
       {/* 채팅 패널 */}
       <div
-        className={`fixed bottom-24 right-6 z-50 w-[360px] max-w-[calc(100vw-48px)] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden transition-all duration-300 origin-bottom-right ${
+        className={`fixed bottom-24 right-6 z-50 w-90 max-w-[calc(100vw-48px)] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden transition-all duration-300 origin-bottom-right ${
           open ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-90 pointer-events-none"
         }`}
         style={{ height: "520px" }}
       >
         <div className="flex flex-col h-full">
           {/* 헤더 */}
-          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-gradient-to-r from-primary to-primary/85 text-primary-foreground shrink-0">
+          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-linear-to-r from-primary to-primary/85 text-primary-foreground shrink-0">
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
               <Sparkles size={16} />
             </div>
@@ -550,7 +553,7 @@ export default function AIAssistant() {
       {/* 플로팅 AI 챗봇 버튼 (기존 채팅 아이콘 바로 위) */}
       <button
         onClick={() => setOpen(!open)}
-        className={`fixed bottom-24 right-6 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 cursor-pointer border-2 border-white/20 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground hover:scale-105 ${
+        className={`fixed bottom-24 right-6 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 cursor-pointer border-2 border-white/20 bg-linear-to-br from-primary to-primary/80 text-primary-foreground hover:scale-105 ${
           open ? "opacity-0 scale-75 pointer-events-none" : "opacity-100 scale-100"
         }`}
         title="AI 챗봇과 대화하기"

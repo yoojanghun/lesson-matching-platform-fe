@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { RotateCcw, Copy, CheckCircle2, Clock } from "lucide-react";
 import { useUserStore } from "../store/useUserStore";
 import { useSaveWeeklyScheduleMutation, useTutorScheduleQuery } from "../hooks/queries/useSchedules";
@@ -26,6 +26,48 @@ const DAY_TO_API: Record<Day, string> = {
 const API_TO_DAY = Object.fromEntries(Object.entries(DAY_TO_API).map(([day, value]) => [value, day])) as Record<string, Day>;
 
 type WeekSlots = Record<Day, Set<number>>;
+
+interface ScheduleSlotProps {
+  day: Day;
+  slot: number;
+  on: boolean;
+  prevOn: boolean;
+  nextOn: boolean;
+  isHourBoundary: boolean;
+  onDown: (day: Day, slot: number) => void;
+  onEnter: (day: Day, slot: number) => void;
+}
+
+const ScheduleSlot = memo(function ScheduleSlot({
+  day,
+  slot,
+  on,
+  prevOn,
+  nextOn,
+  isHourBoundary,
+  onDown,
+  onEnter,
+}: ScheduleSlotProps) {
+  return (
+    <div
+      style={{ width: CELL_W }}
+      onMouseDown={() => onDown(day, slot)}
+      onMouseEnter={() => onEnter(day, slot)}
+      title={`${slotTime(slot)} – ${slotTime(slot + 1)}`}
+      className={[
+        "h-full cursor-pointer transition-colors shrink-0",
+        isHourBoundary ? "border-l border-border/40" : "",
+        on
+          ? [
+              "bg-primary hover:bg-primary/85",
+              !prevOn ? "rounded-l-sm" : "",
+              !nextOn ? "rounded-r-sm" : "",
+            ].join(" ")
+          : "hover:bg-primary/15",
+      ].join(" ")}
+    />
+  );
+});
 
 const makeEmpty = (): WeekSlots =>
   Object.fromEntries(DAYS.map((d) => [d, new Set<number>()])) as WeekSlots;
@@ -64,9 +106,12 @@ export default function SchedulePlanner() {
   const [week, setWeek] = useState<WeekSlots>(makeEmpty);
   const [saved, setSaved] = useState(false);
   const hydratedRef = useRef(false);
+  const weekRef = useRef<WeekSlots>(week);
 
   const baseRef = useRef<WeekSlots | null>(null);
   const dragRef = useRef<{ day: Day; start: number; mode: "on" | "off" } | null>(null);
+
+  weekRef.current = week;
 
   useEffect(() => {
     if (!scheduleQuery.data || hydratedRef.current) return;
@@ -96,9 +141,10 @@ export default function SchedulePlanner() {
     return () => window.removeEventListener("mouseup", up);
   }, []);
 
-  const onDown = (day: Day, slot: number) => {
-    baseRef.current = deepCopy(week);
-    const mode: "on" | "off" = week[day].has(slot) ? "off" : "on";
+  const onDown = useCallback((day: Day, slot: number) => {
+    const currentWeek = weekRef.current;
+    baseRef.current = deepCopy(currentWeek);
+    const mode: "on" | "off" = currentWeek[day].has(slot) ? "off" : "on";
     dragRef.current = { day, start: slot, mode };
     setWeek((prev) => {
       const s = new Set(prev[day]);
@@ -109,9 +155,9 @@ export default function SchedulePlanner() {
       }
       return { ...prev, [day]: s };
     });
-  };
+  }, []);
 
-  const onEnter = (day: Day, slot: number) => {
+  const onEnter = useCallback((day: Day, slot: number) => {
     const d = dragRef.current;
     const b = baseRef.current;
     if (!d || !b || d.day !== day) return;
@@ -126,7 +172,7 @@ export default function SchedulePlanner() {
       }
     }
     setWeek((prev) => ({ ...prev, [day]: s }));
-  };
+  }, []);
 
   const copyMonday = () => {
     const m = new Set(week["월"]);
@@ -251,34 +297,19 @@ export default function SchedulePlanner() {
                       style={{ width: GRID_W, height: 36 }}
                       draggable={false}
                     >
-                      {Array.from({ length: TOTAL_SLOTS }, (_, slot) => {
-                        const on = slots.has(slot);
-                        const prevOn = slot > 0 && slots.has(slot - 1);
-                        const nextOn =
-                          slot < TOTAL_SLOTS - 1 && slots.has(slot + 1);
-                        const isHourBoundary = slot % 2 === 0 && slot > 0;
-
-                        return (
-                          <div
-                            key={slot}
-                            style={{ width: CELL_W }}
-                            onMouseDown={() => onDown(day, slot)}
-                            onMouseEnter={() => onEnter(day, slot)}
-                            title={`${slotTime(slot)} – ${slotTime(slot + 1)}`}
-                            className={[
-                              "h-full cursor-pointer transition-colors shrink-0",
-                              isHourBoundary ? "border-l border-border/40" : "",
-                              on
-                                ? [
-                                    "bg-primary hover:bg-primary/85",
-                                    !prevOn ? "rounded-l-sm" : "",
-                                    !nextOn ? "rounded-r-sm" : "",
-                                  ].join(" ")
-                                : "hover:bg-primary/15",
-                            ].join(" ")}
-                          />
-                        );
-                      })}
+                      {Array.from({ length: TOTAL_SLOTS }, (_, slot) => (
+                        <ScheduleSlot
+                          key={slot}
+                          day={day}
+                          slot={slot}
+                          on={slots.has(slot)}
+                          prevOn={slot > 0 && slots.has(slot - 1)}
+                          nextOn={slot < TOTAL_SLOTS - 1 && slots.has(slot + 1)}
+                          isHourBoundary={slot % 2 === 0 && slot > 0}
+                          onDown={onDown}
+                          onEnter={onEnter}
+                        />
+                      ))}
                     </div>
                   </div>
 

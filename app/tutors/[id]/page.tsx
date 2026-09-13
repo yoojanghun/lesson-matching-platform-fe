@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -137,9 +138,11 @@ export default function TutorDetailPage() {
           {/* Avatar + quick actions */}
           <div className="flex items-end justify-between -mt-10 mb-4">
             <div className="relative">
-              <img
+              <Image
                 src={tutor.avatar}
                 alt={tutor.name}
+                width={80}
+                height={80}
                 className="w-20 h-20 rounded-2xl object-cover border-4 border-card bg-muted shadow-md"
               />
               {tutor.available && (

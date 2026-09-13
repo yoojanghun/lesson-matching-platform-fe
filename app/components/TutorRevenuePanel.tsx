@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -104,9 +104,16 @@ function StatTile({
 export default function TutorRevenuePanel() {
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
 
-  const totalThis = MONTHLY_2026.reduce((s, d) => s + d.revenue, 0);
-  const totalLessons = MONTHLY_2026.reduce((s, d) => s + d.lessons, 0);
-  const avgPerLesson = Math.round(totalThis / totalLessons);
+  const totals = useMemo(() => {
+    const totalThis = MONTHLY_2026.reduce((sum, data) => sum + data.revenue, 0);
+    const totalLessons = MONTHLY_2026.reduce((sum, data) => sum + data.lessons, 0);
+    return {
+      totalThis,
+      totalLessons,
+      avgPerLesson: Math.round(totalThis / totalLessons),
+    };
+  }, []);
+  const { totalThis, totalLessons, avgPerLesson } = totals;
   const prevMonthRev = MONTHLY_2026[MONTHLY_2026.length - 2].revenue;
   const thisMonthRev = MONTHLY_2026[MONTHLY_2026.length - 1].revenue;
   const trend = thisMonthRev >= prevMonthRev ? "up" : "down";

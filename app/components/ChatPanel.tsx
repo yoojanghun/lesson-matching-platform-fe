@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { X, Send, MessageCircle } from "lucide-react";
+import Image from "next/image";
 
 interface Message {
   id: number;
@@ -74,7 +75,7 @@ export default function ChatPanel({ tutorName, tutorAvatar, tutorSubject, onClos
       {/* 헤더 */}
       <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-card shrink-0">
         <div className="relative shrink-0">
-          <img src={tutorAvatar} alt={tutorName} className="w-9 h-9 rounded-full object-cover" />
+          <Image src={tutorAvatar} alt={tutorName} width={36} height={36} className="w-9 h-9 rounded-full object-cover" />
           <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-card rounded-full" />
         </div>
         <div className="flex-1 min-w-0">
@@ -94,7 +95,7 @@ export default function ChatPanel({ tutorName, tutorAvatar, tutorSubject, onClos
         {messages.map((msg) =>
           msg.from === "tutor" ? (
             <div key={msg.id} className="flex items-end gap-2">
-              <img src={tutorAvatar} alt={tutorName} className="w-6 h-6 rounded-full object-cover shrink-0 mb-0.5" />
+              <Image src={tutorAvatar} alt={tutorName} width={24} height={24} className="w-6 h-6 rounded-full object-cover shrink-0 mb-0.5" />
               <div className="max-w-[78%]">
                 <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-3.5 py-2.5 shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
                   <p className="text-sm text-foreground leading-relaxed">{msg.text}</p>
@@ -117,7 +118,7 @@ export default function ChatPanel({ tutorName, tutorAvatar, tutorSubject, onClos
         {/* 입력 중 인디케이터 */}
         {isTyping && (
           <div className="flex items-end gap-2">
-            <img src={tutorAvatar} alt={tutorName} className="w-6 h-6 rounded-full object-cover shrink-0 mb-0.5" />
+            <Image src={tutorAvatar} alt={tutorName} width={24} height={24} className="w-6 h-6 rounded-full object-cover shrink-0 mb-0.5" />
             <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
               <div className="flex gap-1 items-center h-4">
                 {[0, 150, 300].map((delay) => (
