@@ -7,8 +7,7 @@ import { UserProvider } from "./components/UserContext";
 import QueryProvider from "./providers/QueryProvider";
 import Navbar from "./components/Navbar";
 import GlobalToast from "./components/Toast";
-import GlobalChatButton from "./components/GlobalChatButton";
-import AIAssistant from "./components/AIAssistant";
+import DeferredChatWidgets from "./components/DeferredChatWidgets";
 
 export const metadata: Metadata = {
   title: "Lesson Matching Platform",
@@ -34,8 +33,7 @@ export default function RootLayout({
                 <p className="text-xs text-muted-foreground">TutorMatch · Wireframe · Next.js App Router</p>
               </footer>
               <GlobalToast />
-              <GlobalChatButton />
-              <AIAssistant />
+              <DeferredChatWidgets />
             </div>
           </UserProvider>
         </QueryProvider>

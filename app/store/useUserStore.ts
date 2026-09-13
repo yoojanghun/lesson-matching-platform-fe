@@ -263,12 +263,7 @@ export const useUserStore = create<UserState>()(
       partialize: (state) => ({
         role: state.role,
         userName: state.userName,
-        matchings: state.matchings,
-        bookings: state.bookings,
-        payments: state.payments,
-        reviews: state.reviews,
-        studentProfile: state.studentProfile,
-        tutorProfile: state.tutorProfile,
+        userId: state.userId,
       }),
     }
   )

@@ -18,7 +18,7 @@ interface ReviewSlice {
 }
 
 // 리뷰 목록 조회
-export function useReviewsQuery(tutorId?: number) {
+export function useReviewsQuery(tutorId?: number, enabled = true) {
   return useQuery({
     queryKey: tutorId ? queryKeys.reviews.byTutor(tutorId) : queryKeys.reviews.all,
     queryFn: async (): Promise<Review[]> => {
@@ -34,6 +34,7 @@ export function useReviewsQuery(tutorId?: number) {
         content: review.content,
       }));
     },
+    enabled: Boolean(tutorId) && enabled,
     staleTime: 1000 * 60 * 3, // 3분
   });
 }

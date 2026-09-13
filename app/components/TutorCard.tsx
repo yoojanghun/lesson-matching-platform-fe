@@ -27,9 +27,6 @@ export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: (
             height={56}
             className="w-14 h-14 rounded-full object-cover bg-muted"
           />
-          {tutor.available && (
-            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full" />
-          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">

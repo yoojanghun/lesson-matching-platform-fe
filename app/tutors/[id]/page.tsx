@@ -47,7 +47,7 @@ export default function TutorDetailPage() {
 
   // TanStack Query로 튜터 상세 및 리뷰 데이터 조회 (자동 캐싱)
   const { data: tutorQueryData, isLoading: tutorLoading } = useTutorDetailQuery(tutorId);
-  const { data: reviews = [] } = useReviewsQuery(tutorId);
+  const { data: reviews = [] } = useReviewsQuery(tutorId, role !== 'GUEST');
   const createReviewMutation = useCreateReviewMutation();
 
   const tutor = tutorQueryData ?? TUTORS.find((t) => t.id === tutorId) ?? TUTORS[0];
