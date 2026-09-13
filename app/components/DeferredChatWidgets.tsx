@@ -4,10 +4,12 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 
 const GlobalChatButton = dynamic(() => import('./GlobalChatButton'), {
+  ssr: false,
   loading: () => null,
 });
 
 const AIAssistant = dynamic(() => import('./AIAssistant'), {
+  ssr: false,
   loading: () => null,
 });
 
