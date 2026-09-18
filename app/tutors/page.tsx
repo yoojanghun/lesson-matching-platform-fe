@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Check, ChevronDown, Filter, Search, X } from "lucide-react";
 import { useTutorsQuery } from "../hooks/queries/useTutors";
 import { useCategoriesQuery } from "../hooks/queries/useCategories";
+import { useLocationsQuery, useReferencesQuery } from "../hooks/queries/useReferences";
 import TutorCard from "../components/TutorCard";
 
 const REGIONS = ["전체", "서울", "강남구", "마포구", "성동구", "강동구", "노원구", "용산구"];
@@ -44,6 +45,13 @@ function TutorsContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sort, setSort] = useState("인기순");
   const { data: categories = [] } = useCategoriesQuery();
+  const { data: locations = [] } = useLocationsQuery();
+  const { data: references } = useReferencesQuery();
+
+  const GOAL_OPTIONS = references?.lessonGoals?.map(g => g.description) || [];
+  const STYLE_OPTIONS = references?.tutorStyles?.map(s => s.description) || [];
+  const SORT_OPTIONS = references?.sortTypes?.map(s => s.description) || [];
+  const LESSON_TYPE_OPTIONS = references?.lessonTypes?.map(l => l.description) || [];
 
   useEffect(() => {
     if (!serviceModalOpen) return;
@@ -58,14 +66,28 @@ function TutorsContent() {
   const activeCategory = categories.find((category) => category.description === selectedCategory);
 
   // TanStack Query로 튜터 목록 조회 (5분 자동 캐싱)
-  const { data: tutors = [], isLoading, isError } = useTutorsQuery({
-    category: selectedCategory,
-    subject: selectedSubject,
-    region: selectedRegion,
+  const mappedGoalIds = selectedGoals.map((g) => references?.lessonGoals?.find((rg) => rg.description === g)?.goalId).filter(Boolean) as number[];
+  const mappedStyleIds = selectedStyles.map((s) => references?.tutorStyles?.find((rs) => rs.description === s)?.id).filter(Boolean) as number[];
+  const mappedLessonType = selectedLessonTypes.length === 1 ? references?.lessonTypes?.find(lt => lt.description === selectedLessonTypes[0])?.name : undefined;
+  const mappedSortType = references?.sortTypes?.find(st => st.description === sort)?.name;
+  const mappedLocationIds = selectedRegion === '전체' ? undefined : locations.filter(loc => loc.name.includes(selectedRegion)).map(loc => loc.locationId);
+  const subjectObj = activeCategory?.subjects?.find(sub => sub.description === selectedSubject);
+
+  const { data: tutorPage, isLoading, isError } = useTutorsQuery({
+    categoryIds: activeCategory ? [activeCategory.categoryId] : undefined,
+    subjectIds: subjectObj ? [subjectObj.subjectId] : undefined,
+    locationIds: mappedLocationIds,
+    goalIds: mappedGoalIds.length > 0 ? mappedGoalIds : undefined,
+    styleIds: mappedStyleIds.length > 0 ? mappedStyleIds : undefined,
+    lessonType: mappedLessonType,
+    tutorSortType: mappedSortType,
+    minPrice: budgetMin,
+    maxPrice: budgetMax,
     search: searchQuery,
   });
 
   // 정렬 처리
+  const tutors = tutorPage?.content ?? [];
   const sortedTutors = useMemo(() => {
     const list = [...tutors];
     if (sort === "인기순") {

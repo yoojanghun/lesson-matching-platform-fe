@@ -12,7 +12,6 @@ import {
   MapPin,
   Video,
   Info,
-  CheckCircle2,
   GraduationCap,
   Briefcase,
   ChevronDown,
@@ -207,24 +206,6 @@ export default function TutorDetailPage() {
         <p className="text-sm text-foreground leading-relaxed">{tutor.fullIntro ?? tutor.intro}</p>
       </div>
 
-      {/* 수업 방식 */}
-      {tutor.lessonStyle && (
-        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-          <h2 className="text-base font-bold text-foreground mb-3 flex items-center gap-2">
-            <span className="w-1 h-4 bg-accent rounded-full inline-block" />
-            수업 방식
-          </h2>
-          <ul className="space-y-2">
-            {tutor.lessonStyle.map((item, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm text-foreground">
-                <CheckCircle2 size={15} className="text-emerald-500 mt-0.5 shrink-0" />
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {/* 학력 */}
       {tutor.education && (
         <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
@@ -331,6 +312,40 @@ export default function TutorDetailPage() {
         </div>
       )}
 
+      {/* 레슨 목표 */}
+      {lessonGoals.length > 0 && (
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+          <h2 className="text-base font-bold text-foreground mb-3 flex items-center gap-2">
+            <span className="w-1 h-4 bg-accent rounded-full inline-block" />
+            레슨 목표
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {lessonGoals.map((goal, i) => (
+              <span key={`goal-${i}`} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium">
+                {goal}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 수업 방식 및 스타일 */}
+      {tutor.lessonStyle && tutor.lessonStyle.length > 0 && (
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+          <h2 className="text-base font-bold text-foreground mb-3 flex items-center gap-2">
+            <span className="w-1 h-4 bg-accent rounded-full inline-block" />
+            수업 방식 및 스타일
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {tutor.lessonStyle.map((style, i) => (
+              <span key={`style-${i}`} className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-sm font-medium">
+                {style}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 레슨비 옵션 */}
       {tutor.lessonOptions && (
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
@@ -338,7 +353,11 @@ export default function TutorDetailPage() {
             <span className="w-1 h-4 bg-accent rounded-full inline-block" />
             레슨비 안내
           </h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${
+            tutor.lessonOptions.length === 1 ? 'grid-cols-1 max-w-xs mx-auto' :
+            tutor.lessonOptions.length === 2 ? 'grid-cols-2' :
+            'grid-cols-3'
+          }`}>
             {tutor.lessonOptions.map((opt) => (
               <div key={opt.label} className="rounded-xl border border-border bg-white p-4 text-center">
                 <p className="text-xs text-muted-foreground">{opt.label}</p>

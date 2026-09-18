@@ -82,14 +82,6 @@ const LESSON_TYPE_API_VALUES: Record<string, string> = {
   "둘 다 가능": "BOTH",
 };
 
-const BUDGET_API_VALUES: Record<string, string> = {
-  "5만원 이하 / 회": "UNDER_50K",
-  "5~7만원 / 회": "BETWEEN_50K_70K",
-  "7~10만원 / 회": "BETWEEN_70K_100K",
-  "10만원 이상 / 회": "OVER_100K",
-  "상관없음": "NEGOTIABLE",
-};
-
 /* ── UI Components ── */
 function Chip({
   label,

@@ -23,7 +23,12 @@ export interface ReferenceStyle {
 export interface ReferenceGoal {
   goalId: number;
   lessonGoalType: string;
-  description?: string;
+  description: string;
+}
+
+export interface ReferenceEnum {
+  name: string;
+  description: string;
 }
 
 export interface ReferencesResponse {
@@ -31,6 +36,8 @@ export interface ReferencesResponse {
   categories: ReferenceCategory[];
   tutorStyles: ReferenceStyle[];
   lessonGoals: ReferenceGoal[];
+  lessonTypes: ReferenceEnum[];
+  sortTypes: ReferenceEnum[];
 }
 
 export function useReferencesQuery(enabled = true) {

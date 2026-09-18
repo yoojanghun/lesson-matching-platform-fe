@@ -3,38 +3,47 @@ import { useUserStore } from '../store/useUserStore';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
-const PUBLIC_API_PATHS = [
+// EXACT 매칭 및 특정 Public Prefix 구분
+const PUBLIC_EXACT_PATHS = ['/api/categories'];
+const PUBLIC_PREFIX_PATHS = [
   '/api/auth/login',
   '/api/auth/refresh',
-  '/api/sign-up/',
-  '/api/categories',
+  '/api/sign-up',
+  '/api/reference',
+  '/api/tutors/search',
+  '/api/main', // /api/main/home, /api/main/trending, /api/main/rookie 모두 포함됨
 ];
 
 function isPublicApiRequest(url?: string) {
-  return Boolean(url && PUBLIC_API_PATHS.some((path) => url === path || url.startsWith(path)));
+  if (!url) return false;
+  
+  // matchings 관련 요청은 무조건 인증 필요 (Private)
+  if (url.startsWith('/api/matchings')) return false;
+
+  const isExact = PUBLIC_EXACT_PATHS.includes(url);
+  const isPrefix = PUBLIC_PREFIX_PATHS.some((path) => url.startsWith(path));
+  const isTutorDetail = url.startsWith('/api/tutors/') && !url.startsWith('/api/matchings');
+
+  return isExact || isPrefix || isTutorDetail;
 }
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
-  withCredentials: true, // refresh token 쿠키 자동 전송
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// ─── Refresh Token 관련 상태 ────────────────────────────────────────────────
-/** 현재 refresh 요청이 진행 중인지 여부 */
 let isRefreshing = false;
 
-/** refresh 완료를 기다리는 대기 요청 큐 */
 type QueueItem = {
   resolve: (token: string) => void;
   reject: (error: unknown) => void;
 };
 let failedQueue: QueueItem[] = [];
 
-/** 큐에 쌓인 요청들을 일괄 처리 */
 function processQueue(error: unknown, token: string | null) {
   failedQueue.forEach((item) => {
     if (error) {
@@ -46,49 +55,48 @@ function processQueue(error: unknown, token: string | null) {
   failedQueue = [];
 }
 
-/** 강제 로그아웃: Zustand 상태 초기화 + 토큰 제거 후 로그인 페이지로 이동 */
 function forceLogout() {
   if (typeof window === 'undefined') return;
-  // Zustand store의 logout (토큰 제거 + role → GUEST 포함)
   useUserStore.getState().logout();
   if (window.location.pathname !== '/login') {
     window.location.href = '/login';
   }
 }
-// ────────────────────────────────────────────────────────────────────────────
 
-// Request Interceptor: JWT 토큰 자동 주입
+// Request Interceptor: Private API에만 토큰 자동 주입
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    if (typeof window !== 'undefined' && !isPublicApiRequest(config.url)) {
+    if (typeof window !== 'undefined' && config.headers) {
       const token = localStorage.getItem('tm_token');
-      if (token && config.headers) {
+      
+      // ✅ Public API가 아닐 때(Private API)만 토큰을 실어 보냄
+      if (token && !isPublicApiRequest(config.url)) {
         config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        // Public 요청일 경우 헤더에서 토큰 제거
+        delete config.headers.Authorization;
       }
-    } else if (config.headers) {
-      delete config.headers.Authorization;
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: 401 감지 → refresh token으로 재발급 → 원래 요청 재시도
+// Response Interceptor: 401 발생 시 토큰 재발급 로직
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
-    if (isPublicApiRequest(originalRequest.url)) {
+    // Public API에서 발생한 에러는 토큰 재발급을 시도하지 않음
+    if (!originalRequest || isPublicApiRequest(originalRequest.url)) {
       return Promise.reject(error);
     }
 
-    // 401이 아니거나 이미 재시도한 요청은 그냥 reject
     if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
     }
 
-    // refresh 요청 자체가 401이면 무한 루프 방지
     if (originalRequest.url === '/api/auth/refresh') {
       forceLogout();
       return Promise.reject(error);
@@ -96,7 +104,6 @@ apiClient.interceptors.response.use(
 
     originalRequest._retry = true;
 
-    // 이미 refresh 중이면 큐에 넣고 대기
     if (isRefreshing) {
       return new Promise<string>((resolve, reject) => {
         failedQueue.push({ resolve, reject });
@@ -110,27 +117,20 @@ apiClient.interceptors.response.use(
         .catch((err) => Promise.reject(err));
     }
 
-    // Refresh 요청 시작
     isRefreshing = true;
 
     try {
-      // 쿠키에 담긴 refreshToken을 백엔드로 전송 (withCredentials: true로 자동 포함)
       const response = await apiClient.post<{ accessToken: string }>('/api/auth/refresh');
       const newAccessToken = response.data.accessToken;
 
-      // 새 access token 저장
       localStorage.setItem('tm_token', newAccessToken);
-
-      // 대기 중이던 요청들 재시도
       processQueue(null, newAccessToken);
 
-      // 원래 요청 재시도
       if (originalRequest.headers) {
         originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
       }
       return apiClient(originalRequest);
     } catch (refreshError) {
-      // Refresh 실패 → 모든 대기 요청 reject 후 강제 로그아웃
       processQueue(refreshError, null);
       forceLogout();
       return Promise.reject(refreshError);

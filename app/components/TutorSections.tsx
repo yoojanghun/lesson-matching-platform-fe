@@ -3,8 +3,9 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
-import { CATEGORIES, TUTORS } from '../data/mockData';
+import { CATEGORIES } from '../data/mockData';
 import { useCategoriesQuery } from '../hooks/queries/useCategories';
+import { useTrendingTutorsQuery, useRookieTutorsQuery } from '../hooks/queries/useTutors';
 import { useHydrated } from '../hooks/useHydrated';
 import TutorCard from './TutorCard';
 
@@ -16,24 +17,16 @@ export default function TutorSections() {
   const { data: categories, isLoading: isCategoriesLoading } = useCategoriesQuery();
   const isLoggedIn = hydrated && !!localStorage.getItem('tm_token');
 
+  const popularCategoryId = useMemo(() => categories?.find(c => c.description === popularCategory)?.categoryId, [categories, popularCategory]);
+  const latestCategoryId = useMemo(() => categories?.find(c => c.description === latestCategory)?.categoryId, [categories, latestCategory]);
+
+  const { data: popularTutors, isLoading: isPopularLoading } = useTrendingTutorsQuery(popularCategoryId);
+  const { data: latestTutors, isLoading: isLatestLoading } = useRookieTutorsQuery(latestCategoryId);
+
   const categoryOptions = useMemo(() => {
     const options = categories?.map((category) => category.description) ?? CATEGORIES.map((category) => category.label);
     return ['전체', ...options];
   }, [categories]);
-  const popularTutors = useMemo(() => [...TUTORS].sort((a, b) => b.rating - a.rating), []);
-  const latestTutors = useMemo(() => [...TUTORS].sort((a, b) => b.id - a.id), []);
-  const popularFilteredTutors = useMemo(
-    () => popularCategory === '전체'
-      ? popularTutors
-      : popularTutors.filter((tutor) => tutor.subject.toLowerCase().includes(popularCategory.toLowerCase())),
-    [popularCategory, popularTutors],
-  );
-  const latestFilteredTutors = useMemo(
-    () => latestCategory === '전체'
-      ? latestTutors
-      : latestTutors.filter((tutor) => tutor.subject.toLowerCase().includes(latestCategory.toLowerCase())),
-    [latestCategory, latestTutors],
-  );
 
   const categoryTabs = (value: string, setValue: (next: string) => void, prefix: string) => (
     <div className="flex flex-wrap gap-2 mb-5">
@@ -90,7 +83,9 @@ export default function TutorSections() {
         <p className="mb-5 text-sm text-muted-foreground">최근 15일간 매칭과 평점이 높았던 인기 선생님들이에요</p>
         {categoryTabs(popularCategory, setPopularCategory, 'popular')}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {popularFilteredTutors.slice(0, 4).map((tutor) => <TutorCard key={`popular-${tutor.id}`} tutor={tutor} onClick={() => router.push(`/tutors/${tutor.id}`)} />)}
+          {isPopularLoading
+            ? Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-44 rounded-xl bg-muted animate-pulse" />)
+            : popularTutors?.slice(0, 4).map((tutor) => <TutorCard key={`popular-${tutor.id}`} tutor={tutor} onClick={() => router.push(`/tutors/${tutor.id}`)} />)}
         </div>
       </section>
 
@@ -104,7 +99,9 @@ export default function TutorSections() {
         <p className="mb-5 text-sm text-muted-foreground">최근 15일간 새롭게 합류한 선생님들을 만나보세요</p>
         {categoryTabs(latestCategory, setLatestCategory, 'latest')}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {latestFilteredTutors.slice(0, 4).map((tutor) => <TutorCard key={`latest-${tutor.id}`} tutor={tutor} onClick={() => router.push(`/tutors/${tutor.id}`)} />)}
+          {isLatestLoading
+            ? Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-44 rounded-xl bg-muted animate-pulse" />)
+            : latestTutors?.slice(0, 4).map((tutor) => <TutorCard key={`latest-${tutor.id}`} tutor={tutor} onClick={() => router.push(`/tutors/${tutor.id}`)} />)}
         </div>
       </section>
 

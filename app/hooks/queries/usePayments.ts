@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../lib/queryKeys';
 import { useUserStore } from '../../store/useUserStore';
 import type { PaymentItem } from '../../types';
-import { MY_PAYMENTS } from '../../data/mockData';
+import { apiClient } from '../../lib/apiClient';
 
 // 결제 내역 조회
 export function usePaymentsQuery() {
@@ -13,8 +13,29 @@ export function usePaymentsQuery() {
   return useQuery({
     queryKey: queryKeys.payments.lists(),
     queryFn: async (): Promise<PaymentItem[]> => {
-      // API 연동 시: const res = await fetch('/api/v1/payments'); return res.json();
-      return storePayments.length > 0 ? storePayments : MY_PAYMENTS;
+      const response = await apiClient.get<{ content: Array<{
+        paymentId: number;
+        orderId: string;
+        tutorName: string;
+        amount: number;
+        paymentStatus: string;
+        createdAt: string;
+        approvedAt?: string;
+      }> }>('/api/payments', { params: { page: 0, size: 50 } });
+
+      return response.data.content.map(payment => ({
+        id: payment.paymentId,
+        tutor: payment.tutorName,
+        subject: '레슨',
+        avatar: '',
+        lessonDate: payment.createdAt.split(' ')[0], // fallback
+        lessonDay: new Date(payment.createdAt.split(' ')[0]).toLocaleDateString('ko-KR', { weekday: 'short' }),
+        startTime: payment.createdAt.split(' ')[1].substring(0, 5),
+        endTime: payment.createdAt.split(' ')[1].substring(0, 5),
+        price: payment.amount,
+        status: payment.paymentStatus === 'DONE' ? 'paid' : 'unpaid',
+        paidAt: payment.approvedAt,
+      }));
     },
     staleTime: 1000 * 30,
   });

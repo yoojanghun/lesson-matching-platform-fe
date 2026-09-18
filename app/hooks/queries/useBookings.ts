@@ -44,7 +44,35 @@ export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT') {
         }));
       }
 
-      return storeBookings.length > 0 ? storeBookings : MY_LESSON_BOOKINGS;
+      // STUDENT role
+      const response = await apiClient.get<{ content: Array<{
+        reservationId: number;
+        tutorId: number;
+        tutorName: string;
+        lessonDate: string;
+        startTime: string;
+        endTime: string;
+        reservationStatus: string;
+        createdAt: string;
+      }> }>('/api/reservations/student/my', { params: { page: 0, size: 50 } });
+
+      return response.data.content.map((reservation) => ({
+        id: reservation.reservationId,
+        tutor: reservation.tutorName,
+        subject: '레슨',
+        avatar: '',
+        lessonDate: reservation.lessonDate,
+        lessonDay: new Date(`${reservation.lessonDate}T00:00:00`).toLocaleDateString('ko-KR', { weekday: 'short' }),
+        startTime: reservation.startTime,
+        endTime: reservation.endTime,
+        price: 0,
+        status: reservation.reservationStatus === 'CONFIRMED'
+          ? 'confirmed'
+          : reservation.reservationStatus === 'REJECTED'
+            ? 'rejected'
+            : 'pending',
+        requestedAt: reservation.createdAt,
+      }));
     },
     staleTime: 1000 * 30,
   });
