@@ -254,18 +254,13 @@ export default function TutorDetailPage() {
             )}
           </button>
           {activeSections.has('career') && (
-            <div className="px-5 pb-5 border-t border-border pt-4">
-              <div className="relative pl-4 space-y-5">
-                <div className="absolute left-0 top-1 bottom-1 w-px bg-border" />
-                {tutor.careers.map((c, i) => (
-                  <div key={i} className="relative">
-                    <div className="absolute -left-4.25 top-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-card" />
-                    <p className="text-xs text-muted-foreground mb-0.5">{c.period}</p>
-                    <p className="text-sm font-semibold text-foreground">{c.title}</p>
-                    <p className="text-xs text-muted-foreground">{c.org}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="px-5 pb-5 space-y-2.5 border-t border-border pt-4">
+              {tutor.careers.map((c, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                  <p className="text-sm text-foreground">{c.title}</p>
+                </div>
+              ))}
             </div>
           )}
         </div>

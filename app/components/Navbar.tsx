@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, ArrowLeftRight } from "lucide-react";
+import { Menu, X, ArrowLeftRight, UserRound } from "lucide-react";
 import { useUserStore } from "../store/useUserStore";
 import { useHydrated } from "../hooks/useHydrated";
 
@@ -22,7 +22,9 @@ const NAV_ITEMS_TUTOR = [
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const hydrated = useHydrated();
 
@@ -36,6 +38,19 @@ export default function Navbar() {
   const navItems = currentRole === "TUTOR" ? NAV_ITEMS_TUTOR : NAV_ITEMS_STUDENT;
   const otherRole = currentRole === "STUDENT" ? "TUTOR" : "STUDENT";
   const canSwitch = hydrated && availableRoles.length >= 2;
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [profileMenuOpen]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-border backdrop-blur bg-card/95">
@@ -64,38 +79,59 @@ export default function Navbar() {
         {/* Desktop auth buttons */}
         <div className="hidden sm:flex items-center gap-2">
           {currentRole !== "GUEST" ? (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary text-primary">
-                <span className="text-[10px] font-semibold text-primary/70">
-                  {currentRole === "STUDENT" ? "학생" : "튜터"}
-                </span>
-                <span className="text-xs font-bold text-primary">
-                  {userName || (currentRole === "STUDENT" ? "김학생" : "김지수 튜터")}
-                </span>
-              </div>
-              {/* 역할 전환 버튼 — 두 역할 모두 보유 시에만 표시 */}
-              {canSwitch && (
-                <button
-                  title={`${otherRole === 'STUDENT' ? '학생' : '튜터'} 모드로 전환`}
-                  disabled={switching}
-                  onClick={async () => {
-                    setSwitching(true);
-                    try { await switchRoleOnServer(otherRole as 'STUDENT' | 'TUTOR'); }
-                    catch (e) { console.error(e); }
-                    finally { setSwitching(false); }
-                  }}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full border border-accent/40 text-accent text-[11px] font-semibold hover:bg-accent/10 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <ArrowLeftRight size={11} />
-                  {switching ? '전환 중...' : (otherRole === 'STUDENT' ? '학생 모드' : '튜터 모드')}
-                </button>
-              )}
+            <div ref={profileMenuRef} className="relative">
               <button
-                onClick={logout}
-                className="text-xs cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                type="button"
+                aria-label="사용자 메뉴 열기"
+                aria-expanded={profileMenuOpen}
+                onClick={() => setProfileMenuOpen((open) => !open)}
+                className="p-1.5 rounded-full text-foreground hover:bg-muted transition-colors cursor-pointer"
               >
-                로그아웃
+                <UserRound size={22} strokeWidth={1.8} />
               </button>
+              {profileMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-semibold text-foreground">
+                      {userName || (currentRole === "STUDENT" ? "학생" : "튜터")}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {currentRole === "STUDENT" ? "학생" : "튜터"}
+                    </p>
+                  </div>
+                  {canSwitch && (
+                    <button
+                      type="button"
+                      disabled={switching}
+                      onClick={async () => {
+                        setSwitching(true);
+                        try {
+                          await switchRoleOnServer(otherRole as "STUDENT" | "TUTOR");
+                          setProfileMenuOpen(false);
+                        } catch (error) {
+                          console.error(error);
+                        } finally {
+                          setSwitching(false);
+                        }
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <ArrowLeftRight size={16} />
+                      {switching ? "전환 중..." : `${otherRole === "STUDENT" ? "학생" : "튜터"}로 전환`}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setProfileMenuOpen(false);
+                    }}
+                    className="w-full border-t border-border px-4 py-3 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    로그아웃
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <>
