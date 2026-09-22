@@ -21,6 +21,7 @@ export interface UserState {
   role: Role;
   userId: number | null;
   userName: string;
+  availableRoles: Role[];  // 해당 계정이 보유한 역할 목록 (GUEST 제외)
   toast: string | null;
   matchings: StudentMatching[];
   bookings: LessonBooking[];
@@ -37,6 +38,8 @@ export interface UserState {
   signup: (role: Role, name: string) => void;
   logout: () => void;
   setRole: (role: Role, userName?: string, userId?: number) => void;
+  setAvailableRoles: (roles: Role[]) => void;
+  switchRoleOnServer: (targetRole: Role) => Promise<void>;
   addMatching: (tutorId: number, message: string, schedule: string) => void;
   updateMatchingStatus: (id: number, status: 'accepted' | 'rejected') => void;
   addBooking: (booking: Omit<LessonBooking, 'id' | 'requestedAt'>) => void;
@@ -89,6 +92,7 @@ export const useUserStore = create<UserState>()(
       role: 'GUEST',
       userId: null,
       userName: '',
+      availableRoles: [],
       toast: null,
       matchings: MY_MATCHINGS_STUDENT,
       bookings: MY_LESSON_BOOKINGS,
@@ -146,6 +150,36 @@ export const useUserStore = create<UserState>()(
           ...(newUserName !== undefined && { userName: newUserName }),
           ...(newUserId !== undefined && { userId: newUserId }),
         });
+      },
+
+      setAvailableRoles: (roles: Role[]) => {
+        set({ availableRoles: roles });
+      },
+
+      switchRoleOnServer: async (targetRole: Role) => {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('tm_token') : null;
+        if (!token) throw new Error('로그인 상태가 아닙니다.');
+
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'}/api/auth/switch-role?role=${targetRole}`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
+          }
+        );
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error((body as { message?: string }).message ?? '역할 전환에 실패했습니다.');
+        }
+
+        const data = (await res.json()) as { accessToken: string };
+        localStorage.setItem('tm_token', data.accessToken);
+        set({ role: targetRole });
+        get().showToast(
+          targetRole === 'STUDENT' ? '학생 모드로 전환했습니다.' : '튜터 모드로 전환했습니다.'
+        );
       },
 
       addMatching: (tutorId: number, message: string, schedule: string) => {
@@ -264,6 +298,7 @@ export const useUserStore = create<UserState>()(
         role: state.role,
         userName: state.userName,
         userId: state.userId,
+        availableRoles: state.availableRoles,
       }),
     }
   )

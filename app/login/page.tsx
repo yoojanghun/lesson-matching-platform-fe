@@ -9,8 +9,8 @@ import { apiClient } from '../lib/apiClient';
 import type { Role } from '../store/useUserStore';
 
 interface LoginRequest {
-  username: string,
-  password: string
+  username: string;
+  password: string;
 }
 
 interface LoginResponse {
@@ -39,7 +39,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
-  const { setRole, quickLogin } = useUser();
+  const { setRole, setAvailableRoles, quickLogin } = useUser();
 
   // 로그인 Mutation 정의
   const loginMutation = useMutation({
@@ -51,43 +51,50 @@ export default function LoginPage() {
       // 1. Access Token localStorage 저장
       localStorage.setItem('tm_token', accessToken);
 
-      // 2. JWT payload 디코딩 → role 추출
+      // 2. JWT payload 디코딩 → activeRole + 보유 역할 추출
       const payload = decodeJwtPayload(accessToken);
       if (payload) {
-        // 백엔드 roles: ["ROLE_STUDENT"], ["ROLE_TUTOR"], ["STUDENT"], ["TUTOR"] 등 처리
-        const normalizedRoles = payload.roles.map((r) => String(r).replace(/^ROLE_/, '').toUpperCase());
-        let role: Role = 'GUEST';
-        if (normalizedRoles.includes('TUTOR')) {
-          role = 'TUTOR';
-        } else if (normalizedRoles.includes('STUDENT')) {
-          role = 'STUDENT';
+        const normalizedRoles = payload.roles.map((r) => String(r).replace(/^ROLE_/, '').toUpperCase()) as Role[];
+        // activeRole 클레임 우선, 없으면 첫 번째 비-GUEST 역할
+        const activeRaw = (payload as Record<string, unknown>).activeRole as string | undefined;
+        const activeNormalized = activeRaw
+          ? (activeRaw.replace(/^ROLE_/, '').toUpperCase() as Role)
+          : null;
+        let role: Role = activeNormalized ?? 'GUEST';
+        if (!activeNormalized) {
+          if (normalizedRoles.includes('TUTOR')) role = 'TUTOR';
+          else if (normalizedRoles.includes('STUDENT')) role = 'STUDENT';
         }
 
         setRole(role, payload.sub, payload.userId);
+        setAvailableRoles(normalizedRoles.filter((r) => r !== 'GUEST') as Role[]);
       }
 
       router.push('/');
     },
     onError: (error) => {
       console.error('로그인 실패', error);
-      setError(error instanceof Error ? error.message : '로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
+      // axios 에러의 경우 서버 응답 메시지 우선 표시
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      const serverMsg = axiosError?.response?.data?.message;
+      setError(serverMsg ?? (error instanceof Error ? error.message : '로그인 중 오류가 발생했습니다. 다시 시도해주세요.'));
     }
   });
 
   // Form 제출 핸들러
-  const handleSubmitLogin = (e: React.SubmitEvent) => {
+  const handleSubmitLogin = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!userId.trim() || !password) {
       setError('이메일과 비밀번호를 모두 입력해 주세요.');
       return;
     }
-    
+
     loginMutation.mutate({
       username: userId.trim(),
-      password: password.trim()
+      password: password.trim(),
     });
-  }
+  };
 
   const handleQuickLogin = (account: TestAccount) => {
     quickLogin(account);
@@ -177,11 +184,12 @@ export default function LoginPage() {
         )}
 
         <button
+          id="login-submit"
           type="submit"
           disabled={loginMutation.isPending}
-          className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors cursor-pointer"
+          className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {loginMutation.isPending ? "로그인 중..." : "로그인"}
+          {loginMutation.isPending ? '로그인 중...' : '로그인'}
         </button>
 
         <div className="flex items-center gap-3">
@@ -190,11 +198,11 @@ export default function LoginPage() {
           <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* Google OAuth */}
+        {/* Google OAuth - 백엔드 OAuth2 엔드포인트로 리다이렉트 */}
         <button
           type="button"
           onClick={() => {
-            handleQuickLogin(MOCK_ACCOUNTS[0]);
+            window.location.href = `${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'}/oauth2/authorization/google`;
           }}
           className="w-full flex items-center justify-center gap-3 py-2.5 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
         >

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ArrowLeftRight } from "lucide-react";
 import { useUserStore } from "../store/useUserStore";
 import { useHydrated } from "../hooks/useHydrated";
 
@@ -22,17 +22,20 @@ const NAV_ITEMS_TUTOR = [
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const pathname = usePathname();
   const hydrated = useHydrated();
 
-  // Zustand Selector 최적화: 필요한 상태만 개별 구독
   const role = useUserStore((s) => s.role);
   const userName = useUserStore((s) => s.userName);
   const logout = useUserStore((s) => s.logout);
+  const availableRoles = useUserStore((s) => s.availableRoles);
+  const switchRoleOnServer = useUserStore((s) => s.switchRoleOnServer);
 
-  // SSR 단계이거나 아직 hydration 되지 않은 경우 기본 게스트 상태 유지
   const currentRole = hydrated ? role : "GUEST";
   const navItems = currentRole === "TUTOR" ? NAV_ITEMS_TUTOR : NAV_ITEMS_STUDENT;
+  const otherRole = currentRole === "STUDENT" ? "TUTOR" : "STUDENT";
+  const canSwitch = hydrated && availableRoles.length >= 2;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border backdrop-blur bg-card/95">
@@ -70,6 +73,23 @@ export default function Navbar() {
                   {userName || (currentRole === "STUDENT" ? "김학생" : "김지수 튜터")}
                 </span>
               </div>
+              {/* 역할 전환 버튼 — 두 역할 모두 보유 시에만 표시 */}
+              {canSwitch && (
+                <button
+                  title={`${otherRole === 'STUDENT' ? '학생' : '튜터'} 모드로 전환`}
+                  disabled={switching}
+                  onClick={async () => {
+                    setSwitching(true);
+                    try { await switchRoleOnServer(otherRole as 'STUDENT' | 'TUTOR'); }
+                    catch (e) { console.error(e); }
+                    finally { setSwitching(false); }
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full border border-accent/40 text-accent text-[11px] font-semibold hover:bg-accent/10 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <ArrowLeftRight size={11} />
+                  {switching ? '전환 중...' : (otherRole === 'STUDENT' ? '학생 모드' : '튜터 모드')}
+                </button>
+              )}
               <button
                 onClick={logout}
                 className="text-xs cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
@@ -119,12 +139,29 @@ export default function Navbar() {
           ))}
           <div className="pt-2 flex gap-2">
             {currentRole !== "GUEST" ? (
+            <>
+              {canSwitch && (
+                <button
+                  disabled={switching}
+                  onClick={async () => {
+                    setSwitching(true);
+                    try { await switchRoleOnServer(otherRole as 'STUDENT' | 'TUTOR'); }
+                    catch (e) { console.error(e); }
+                    finally { setSwitching(false); setMobileMenuOpen(false); }
+                  }}
+                  className="flex-1 py-2 border border-accent/40 rounded-lg text-sm text-accent font-semibold text-center cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <ArrowLeftRight size={13} />
+                  {switching ? '전환 중...' : (otherRole === 'STUDENT' ? '학생 모드로' : '튜터 모드로')}
+                </button>
+              )}
               <button
                 onClick={() => { logout(); setMobileMenuOpen(false); }}
                 className="flex-1 py-2 border border-border rounded-lg text-sm text-foreground text-center cursor-pointer"
               >
                 로그아웃 ({userName || (currentRole === "STUDENT" ? "학생" : "튜터")})
               </button>
+            </>
             ) : (
               <>
                 <Link
