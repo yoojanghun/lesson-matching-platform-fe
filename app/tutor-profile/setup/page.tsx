@@ -30,10 +30,14 @@ const INSTRUMENTS = [
 export default function TutorProfileSetupPage() {
   const router = useRouter();
   const { data: categories, isLoading: categoriesLoading } = useCategoriesQuery();
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [selectedInstruments, setSelectedInstruments] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [introduction, setIntroduction] = useState('');
+  const [educations, setEducations] = useState<string[]>([]);
+  const [educationInput, setEducationInput] = useState('');
+  const [experiences, setExperiences] = useState<string[]>([]);
+  const [experienceInput, setExperienceInput] = useState('');
   const [lessonType, setLessonType] = useState<'ONLINE' | 'OFFLINE' | 'BOTH'>('ONLINE');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -92,8 +96,8 @@ export default function TutorProfileSetupPage() {
         title: title.trim(),
         introduction: introduction.trim(),
         lessonType,
-        educations: [],
-        experiences: [],
+        educations,
+        experiences,
         locationIds: [],
         styleIds: [],
         goalIds: [],
@@ -110,22 +114,45 @@ export default function TutorProfileSetupPage() {
     }
   };
 
+  const addEducation = () => {
+    const value = educationInput.trim();
+    if (!value) return;
+    setEducations((current) => [...current, value]);
+    setEducationInput('');
+  };
+
+  const addExperience = () => {
+    const value = experienceInput.trim();
+    if (!value) return;
+    setExperiences((current) => [...current, value]);
+    setExperienceInput('');
+  };
+
+  const stepLabels = ['악기 선택', '레슨 소개', '학력', '경력', '수업 방식'];
+  const visibleStepStart = step <= 2 ? 0 : step >= 4 ? 2 : 1;
+  const visibleSteps = stepLabels.slice(visibleStepStart, visibleStepStart + 3);
+
   return (
     <main className="mx-auto min-h-[calc(100vh-3.5rem)] max-w-2xl bg-background px-5 py-8 sm:px-10 sm:py-10">
-      <div className="mb-9 flex items-center gap-3 text-sm text-muted-foreground">
-        <div className={`flex items-center gap-2 ${step === 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
-          <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${step === 1 ? 'bg-accent text-accent-foreground' : 'bg-green-500 text-white'}`}>
-            {step === 1 ? '1' : <Check size={15} />}
-          </span>
-          악기 선택
-        </div>
-        <div className={`h-px flex-1 ${step === 2 ? 'bg-accent' : 'bg-border'}`} />
-        <div className={`flex items-center gap-2 ${step === 2 ? 'text-foreground' : 'text-muted-foreground'}`}>
-          <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${step === 2 ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'}`}>
-            2
-          </span>
-          레슨 소개
-        </div>
+      <div className="mx-auto mb-9 grid w-full max-w-152 grid-cols-[2.5rem_minmax(0,1fr)_3.5rem_minmax(0,1fr)_3.5rem_minmax(0,1fr)_2.5rem] items-center text-sm text-muted-foreground">
+        <span className={visibleStepStart > 0 ? 'visible text-center tracking-[0.25em]' : 'invisible'} aria-hidden="true">...</span>
+        {visibleSteps.map((label, index) => {
+          const number = visibleStepStart + index + 1;
+          const completed = step > number;
+          const current = step === number;
+          return (
+            <div key={label} className="contents">
+              <div className="flex min-w-0 items-center justify-center gap-2">
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${current ? 'bg-accent text-accent-foreground' : completed ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                  {completed ? <Check size={15} /> : number}
+                </span>
+                <span className={`whitespace-nowrap ${current ? 'text-foreground' : 'text-muted-foreground'}`}>{label}</span>
+              </div>
+              {index < visibleSteps.length - 1 && <span className="h-px w-full bg-border" aria-hidden="true" />}
+            </div>
+          );
+        })}
+        <span className={visibleStepStart + visibleSteps.length < stepLabels.length ? 'visible text-center tracking-[0.25em]' : 'invisible'} aria-hidden="true">...</span>
       </div>
 
       {step === 1 ? (
@@ -169,7 +196,7 @@ export default function TutorProfileSetupPage() {
             </button>
           </div>
         </section>
-      ) : (
+      ) : step === 2 ? (
         <section>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">레슨을 소개해주세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">학생들이 레슨을 선택하는 데 도움이 됩니다</p>
@@ -201,25 +228,6 @@ export default function TutorProfileSetupPage() {
               />
               <p className="mt-1 text-right text-xs text-muted-foreground">{introduction.length}/500</p>
             </div>
-            <div>
-              <p className="mb-2 text-sm font-semibold text-foreground">수업 형태 <span className="text-accent">*</span></p>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  ['ONLINE', '온라인 수업'],
-                  ['OFFLINE', '대면 수업'],
-                  ['BOTH', '둘 다 가능'],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setLessonType(value as 'ONLINE' | 'OFFLINE' | 'BOTH')}
-                    className={`rounded-lg border px-2 py-2.5 text-xs font-medium transition-colors cursor-pointer ${lessonType === value ? 'border-accent bg-accent/5 text-accent' : 'border-border bg-card text-muted-foreground hover:border-accent/50'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           {errorMessage && <p className="mt-5 text-sm text-red-500">{errorMessage}</p>}
@@ -231,12 +239,84 @@ export default function TutorProfileSetupPage() {
             <button
               type="button"
               disabled={!title.trim() || !introduction.trim() || submitting}
-              onClick={finishSetup}
+              onClick={() => setStep(3)}
               className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer"
             >
-              {submitting ? '가입 처리 중...' : '등록 완료'}
+              다음
             </button>
           </div>
+        </section>
+      ) : step === 3 ? (
+        <section>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">학력을 입력해주세요</h1>
+          <p className="mt-2 text-sm text-muted-foreground">선택 사항입니다. 입력하지 않아도 됩니다.</p>
+          <div className="mt-7 flex gap-2">
+            <input value={educationInput} onChange={(event) => setEducationInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addEducation(); } }} placeholder="예) 서울대학교 음악대학 피아노 전공" className="h-12 min-w-0 flex-1 rounded-xl border-2 border-border bg-card px-4 text-sm text-foreground outline-none focus:border-accent" />
+            <button type="button" onClick={addEducation} className="rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">+ 추가</button>
+          </div>
+          <div className={`mt-6 overflow-hidden rounded-xl ${educations.length > 0 ? 'border border-border bg-card' : ''}`}>
+            {educations.length === 0 ? <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border px-5 py-8 text-center text-sm text-muted-foreground"><span className="mb-2 text-2xl">🎓</span>아직 입력된 항목이 없습니다</div> : (
+              <>
+                <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-5 py-3 text-xs font-semibold text-muted-foreground">
+                  <span className="text-base">🎓</span><span>학력 목록</span><span className="ml-auto font-normal">{educations.length}개</span>
+                </div>
+                <div className="max-h-55 overflow-y-auto">
+                <ul className="divide-y divide-border">
+                  {educations.map((education, index) => (
+                    <li key={`${education}-${index}`} className="group flex items-center gap-3 px-5 py-3 text-sm text-foreground hover:bg-accent/5"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-border" /><span className="flex-1">{education}</span><button type="button" onClick={() => setEducations((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="h-6 w-6 rounded-full text-base leading-none text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-50 hover:text-red-400 cursor-pointer" aria-label={`${education} 삭제`}>×</button></li>
+                  ))}
+                </ul>
+                </div>
+              </>
+              )}
+          </div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(2)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(4)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+        </section>
+      ) : step === 4 ? (
+        <section>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">경력을 입력해주세요</h1>
+          <p className="mt-2 text-sm text-muted-foreground">선택 사항입니다. 입력하지 않아도 됩니다.</p>
+          <div className="mt-7 flex gap-2">
+            <input value={experienceInput} onChange={(event) => setExperienceInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addExperience(); } }} placeholder="예) 독일 유학 5년" className="h-12 min-w-0 flex-1 rounded-xl border-2 border-border bg-card px-4 text-sm text-foreground outline-none focus:border-accent" />
+            <button type="button" onClick={addExperience} className="rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">+ 추가</button>
+          </div>
+          <div className={`mt-6 overflow-hidden rounded-xl ${experiences.length > 0 ? 'border border-border bg-card' : ''}`}>
+            {experiences.length === 0 ? <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border px-5 py-8 text-center text-sm text-muted-foreground"><span className="mb-2 text-2xl">💼</span>아직 입력된 항목이 없습니다</div> : (
+              <>
+                <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-5 py-3 text-xs font-semibold text-muted-foreground">
+                  <span className="text-base">💼</span><span>경력 목록</span><span className="ml-auto font-normal">{experiences.length}개</span>
+                </div>
+                <div className="max-h-55 overflow-y-auto">
+                <ul className="divide-y divide-border">
+                  {experiences.map((experience, index) => (
+                    <li key={`${experience}-${index}`} className="group flex items-center gap-3 px-5 py-3 text-sm text-foreground hover:bg-accent/5"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-border" /><span className="flex-1">{experience}</span><button type="button" onClick={() => setExperiences((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="h-6 w-6 rounded-full text-base leading-none text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-50 hover:text-red-400 cursor-pointer" aria-label={`${experience} 삭제`}>×</button></li>
+                  ))}
+                </ul>
+                </div>
+              </>
+              )}
+          </div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(3)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(5)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+        </section>
+      ) : (
+        <section>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">수업 방식을 선택해주세요</h1>
+          <p className="mt-2 text-sm text-muted-foreground">학생들이 레슨 신청 전 확인하는 정보입니다.</p>
+          <div className="mt-8 space-y-3">
+            {[
+              ['OFFLINE', '대면 수업', '직접 만나서 레슨을 진행합니다'],
+              ['ONLINE', '온라인 수업', '화상 통화로 원격 레슨을 진행합니다'],
+              ['BOTH', '대면 + 온라인 모두 가능', '학생 상황에 맞춰 유연하게 진행합니다'],
+            ].map(([value, label, description]) => (
+              <button key={value} type="button" onClick={() => setLessonType(value as 'ONLINE' | 'OFFLINE' | 'BOTH')} className={`flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition-colors cursor-pointer ${lessonType === value ? 'border-accent bg-accent/5' : 'border-border bg-card hover:border-accent/50'}`}>
+                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl ${lessonType === value ? 'bg-accent/15' : 'bg-muted'}`} aria-hidden="true">{value === 'OFFLINE' ? '🏫' : value === 'ONLINE' ? '💻' : '🔄'}</span>
+                <span className="flex-1"><strong className="block text-sm text-foreground">{label}</strong><span className="mt-1 block text-xs text-muted-foreground">{description}</span></span>
+                <span className={`h-5 w-5 rounded-full border-2 ${lessonType === value ? 'border-accent bg-accent' : 'border-border'}`} />
+              </button>
+            ))}
+          </div>
+          {errorMessage && <p className="mt-5 text-sm text-red-500">{errorMessage}</p>}
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(4)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" disabled={submitting} onClick={finishSetup} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">{submitting ? '가입 처리 중...' : '등록 완료'}</button></div>
         </section>
       )}
     </main>
