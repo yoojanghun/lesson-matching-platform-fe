@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Check } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useCategoriesQuery } from '../../hooks/queries/useCategories';
 import { useLocationsQuery, useReferencesQuery } from '../../hooks/queries/useReferences';
+import { useSaveTutorProfileMutation, useTutorProfileQuery } from '../../hooks/queries/useProfiles';
 
 interface PendingTutorSignup {
   name: string;
@@ -55,7 +57,11 @@ const STYLE_DESCRIPTIONS: Record<string, string> = {
 
 export default function TutorProfileSetupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editMode = searchParams.get('edit') === 'instruments';
   const { data: categories, isLoading: categoriesLoading } = useCategoriesQuery();
+  const tutorProfileQuery = useTutorProfileQuery(editMode);
+  const saveTutorProfileMutation = useSaveTutorProfileMutation();
   const { data: locations = [], isLoading: locationsLoading, isError: locationsError } = useLocationsQuery();
   const { data: references, isLoading: referencesLoading, isError: referencesError } = useReferencesQuery();
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10>(1);
@@ -80,12 +86,48 @@ export default function TutorProfileSetupPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  useEffect(() => {
+    if (!editMode || !categories || !tutorProfileQuery.data) return;
+    const profile = tutorProfileQuery.data;
+    const profileCategoryNames = profile.categories.map((category) => category.categoryType);
+    const profileSubjectNames = profile.subjects.map((subject) => subject.subjectType);
+    const matchedCategories = categories.filter((category) =>
+      profileCategoryNames.includes(category.categoryName) || profileCategoryNames.includes(category.description),
+    );
+    setSelectedInstruments(matchedCategories.map((category) => category.description));
+    setSelectedSubjects(matchedCategories.flatMap((category) => category.subjects)
+      .filter((subject) => profileSubjectNames.includes(subject.subjectName) || profileSubjectNames.includes(subject.description))
+      .map((subject) => subject.subjectId));
+    setActiveCategoryId(matchedCategories[0]?.categoryId ?? null);
+  }, [categories, editMode, tutorProfileQuery.data]);
+
   const toggleInstrument = (instrument: string) => {
     setSelectedInstruments((current) =>
       current.includes(instrument)
         ? current.filter((item) => item !== instrument)
         : [...current, instrument],
     );
+  };
+
+  const completeInstrumentEdit = () => {
+    if (!categories) return;
+    const matchedCategories = categories.filter((category) =>
+      selectedInstruments.some((instrument) =>
+        category.description === instrument || category.categoryName === instrument,
+      ),
+    );
+    const categoryIds = matchedCategories.map((category) => category.categoryId);
+    const subjectIds = selectedSubjects.filter((subjectId) =>
+      matchedCategories.some((category) => category.subjects.some((subject) => subject.subjectId === subjectId)),
+    );
+    if (categoryIds.length === 0 || subjectIds.length === 0) {
+      setErrorMessage('악기와 세부 분야를 하나 이상 선택해 주세요.');
+      return;
+    }
+    saveTutorProfileMutation.mutate({ categoryIds, subjectIds }, {
+      onSuccess: () => router.push('/tutor-profile'),
+      onError: () => setErrorMessage('악기 정보 수정에 실패했습니다. 다시 시도해 주세요.'),
+    });
   };
 
   const finishSetup = async () => {
@@ -278,7 +320,7 @@ export default function TutorProfileSetupPage() {
           </div>
 
           <div className="mt-10 flex gap-3">
-            <button type="button" onClick={() => router.push('/signup')} className="h-13 flex-1 rounded-xl border-2 border-border bg-card text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer">
+            <button type="button" onClick={() => router.push(editMode ? '/tutor-profile' : '/signup')} className="h-13 flex-1 rounded-xl border-2 border-border bg-card text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer">
               이전
             </button>
             <button
@@ -286,11 +328,12 @@ export default function TutorProfileSetupPage() {
               disabled={selectedInstruments.length === 0}
               onClick={() => {
                 setActiveCategoryId(selectedCategories[0]?.categoryId ?? null);
-                setStep(2);
+                if (editMode) completeInstrumentEdit();
+                else setStep(2);
               }}
               className="h-13 flex-[1.8] rounded-xl bg-accent text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer"
             >
-              다음
+              {editMode ? '수정 완료' : '다음'}
             </button>
           </div>
         </section>

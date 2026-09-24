@@ -1,6 +1,7 @@
 'use client';
 
 import React, { startTransition, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   User,
   GraduationCap,
@@ -110,6 +111,18 @@ function InputRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
+function ProfileSection({ icon, title, onEdit, children }: { icon: string; title: string; onEdit?: () => void; children: React.ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+      <div className="flex items-center justify-between border-b border-border px-5 py-4">
+        <h3 className="flex items-center gap-2 text-base font-bold text-foreground"><span aria-hidden="true">{icon}</span>{title}</h3>
+        {onEdit && <button type="button" onClick={onEdit} className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer">수정</button>}
+      </div>
+      <div className="px-5 py-5">{children}</div>
+    </section>
+  );
+}
+
 function PrivacyToggle({ isPublic, onClick }: { isPublic: boolean; onClick: () => void }) {
   return (
     <button
@@ -134,6 +147,7 @@ let _id = 100;
 const uid = () => ++_id;
 
 export default function TutorProfilePage() {
+  const router = useRouter();
   const role = useUserStore((state) => state.role);
   const { data: categories } = useCategoriesQuery();
   const { data: references } = useReferencesQuery(role !== 'GUEST');
@@ -184,6 +198,7 @@ export default function TutorProfilePage() {
 
   /* 저장 */
   const [saved, setSaved] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // 저장된 프로필이 있다면 불러오기
   useEffect(() => {
@@ -230,16 +245,66 @@ export default function TutorProfilePage() {
       setEmailPublic(profile.emailPublic ?? true);
       setPhoneNumberPublic(profile.phoneNumberPublic ?? true);
       setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
-      setSubjects(profile.categories.map((category) =>
-        categories?.find((item) => item.categoryName === category.categoryType)?.description ?? category.categoryType ?? ''
-      ).filter(Boolean));
+      setSubjects(profile.subjects.map((subject) => subject.subjectType ?? '').filter(Boolean));
+      setGoals(profile.goals.map((goal) => goal.description ?? '').filter(Boolean));
       setTeachStyles(profile.styles.map((style) => style.description ?? '').filter(Boolean));
       setTeachNote(profile.content ?? '');
       setTitle(profile.title ?? '');
       setIntro(profile.introduction ?? '');
+      setLessonType(profile.lessonType === 'OFFLINE' ? '대면 수업' : profile.lessonType === 'ONLINE' ? '온라인 수업' : profile.lessonType === 'BOTH' ? '둘 다 가능' : '');
       setCareers(profile.career ? profile.career.split('\n').map((text, index) => ({ id: index + 1, text })) : [{ id: uid(), text: '' }]);
     });
   }, [categories, profileQuery.data, references, userName]);
+
+  const saveProfile = () => {
+    const profileData: TutorProfileData = {
+      name,
+      title,
+      birthDate,
+      email,
+      phoneNumber,
+      birthDatePublic,
+      emailPublic,
+      phoneNumberPublic,
+      location,
+      subjects,
+      goals,
+      educations: educations.filter((item) => item.text.trim()),
+      careers: careers.filter((item) => item.text.trim()),
+      fees: fees.filter((item) => item.type.trim() && item.price.trim()),
+      teachStyles,
+      teachNote,
+      lessonType,
+      intro,
+    };
+
+    saveProfileMutation.mutate({
+      name: name || undefined,
+      title: title || undefined,
+      email: email || undefined,
+      phoneNumber: phoneNumber || undefined,
+      birthDate: birthDate || undefined,
+      birthDatePublic,
+      emailPublic,
+      phoneNumberPublic,
+      categoryIds: categories?.filter((category) => subjects.includes(category.description)).map((category) => category.categoryId),
+      subjectIds: categories?.filter((category) => subjects.includes(category.description)).flatMap((category) => category.subjects.map((subject) => subject.subjectId)),
+      styleIds: references?.tutorStyles.filter((style) => teachStyles.includes(style.description)).map((style) => style.id),
+      goalIds: references?.lessonGoals.filter((goal) => goals.includes(goal.description ?? '')).map((goal) => goal.goalId),
+      locationIds: references?.locations.filter((item) => location.split(',').map((value) => value.trim()).includes(item.name)).map((item) => item.locationId),
+      experiences: careers.filter((item) => item.text.trim()).map((item) => item.text.trim()),
+      educations: educations.filter((item) => item.text.trim()).map((item) => item.text.trim()),
+      prices: fees.filter((item) => item.type.trim() && item.price.trim()).map((item) => ({ className: item.type.trim(), price: Number(item.price.replace(/,/g, '')) || 0 })),
+      introduction: intro || undefined,
+    }, {
+      onSuccess: () => {
+        saveTutorProfile(profileData);
+        setSaved(true);
+        setIsEditing(false);
+        setTimeout(() => setSaved(false), 2000);
+      },
+    });
+  };
 
   if (role === 'GUEST') {
     return (
@@ -247,6 +312,42 @@ export default function TutorProfilePage() {
         title="선생님 프로필 작성을 위해 로그인이 필요합니다"
         description="프로필을 등록하면 학생들에게 내 수업 정보가 노출되고 더 많은 레슨 매칭 기회를 얻을 수 있습니다."
       />
+    );
+  }
+
+  if (role === 'TUTOR' && !isEditing) {
+    const educationItems = educations.filter((item) => item.text.trim());
+    const careerItems = careers.filter((item) => item.text.trim());
+    const feeItems = fees.filter((item) => item.type.trim() && item.price.trim());
+    const teachingCategories = (categories ?? []).map((category) => ({
+      category,
+      subjects: category.subjects.filter((subject) => subjects.includes(subject.description) || subjects.includes(subject.subjectName)),
+    })).filter((item) => item.subjects.length > 0);
+    const edit = () => setIsEditing(true);
+    const empty = (text: string) => <p className="text-sm italic text-muted-foreground">{text}</p>;
+
+    return (
+      <div className="mx-auto max-w-2xl space-y-5">
+        <div className="mb-7"><h2 className="text-2xl font-bold text-foreground">내 프로필 <span className="text-lg font-normal text-muted-foreground">(선생님)</span></h2><p className="mt-1 text-sm text-muted-foreground">프로필과 레슨비를 상세히 작성할수록 학생 매칭 및 레슨 예약 전환율이 높아집니다.</p></div>
+        <ProfileSection icon="👤" title="기본 정보">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5"><div className="flex h-7 items-center"><label className="text-[11px] font-semibold text-muted-foreground">이름</label></div><input type="text" placeholder="예) 김지수" value={name} onChange={(event) => setName(event.target.value)} className={INPUT_BASE} /></div>
+            <div className="space-y-1.5"><div className="flex items-center justify-between"><label className="text-[11px] font-semibold text-muted-foreground">생년월일</label><PrivacyToggle isPublic={birthDatePublic} onClick={() => setBirthDatePublic((current) => !current)} /></div><input type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} className={INPUT_BASE} /></div>
+            <div className="space-y-1.5"><div className="flex items-center justify-between"><label className="text-[11px] font-semibold text-muted-foreground">이메일</label><PrivacyToggle isPublic={emailPublic} onClick={() => setEmailPublic((current) => !current)} /></div><input type="email" placeholder="예) tutor@example.com" value={email} onChange={(event) => setEmail(event.target.value)} className={INPUT_BASE} /></div>
+            <div className="space-y-1.5"><div className="flex items-center justify-between"><label className="text-[11px] font-semibold text-muted-foreground">전화번호</label><PrivacyToggle isPublic={phoneNumberPublic} onClick={() => setPhoneNumberPublic((current) => !current)} /></div><input type="tel" placeholder="예) 010-1234-5678" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} className={INPUT_BASE} /></div>
+          </div>
+        </ProfileSection>
+        <ProfileSection icon="🎵" title="가르치는 악기 / 분야" onEdit={() => router.push('/tutor-profile/setup?edit=instruments')}>{teachingCategories.length ? <div className="space-y-4">{teachingCategories.map(({ category, subjects: categorySubjects }) => <div key={category.categoryId}><p className="mb-2 text-sm font-semibold text-foreground">{category.icon || '🎵'} {category.description || category.categoryName}</p><div className="flex flex-wrap gap-2">{categorySubjects.map((subject) => <span key={subject.subjectId} className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">{subject.description || subject.subjectName}</span>)}</div></div>)}</div> : empty('선택된 악기가 없습니다.')}</ProfileSection>
+        <ProfileSection icon="📝" title="레슨 소개" onEdit={edit}>{title || intro ? <div className="space-y-2"><p className="text-base font-semibold text-foreground">{title}</p><p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{intro}</p></div> : empty('레슨 소개가 없습니다.')}</ProfileSection>
+        <ProfileSection icon="🎯" title="레슨 목표" onEdit={edit}>{goals.length ? <div className="flex flex-wrap gap-2">{goals.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 레슨 목표가 없습니다.')}</ProfileSection>
+        <ProfileSection icon="🎓" title="학력" onEdit={edit}>{educationItems.length ? <ul className="space-y-2">{educationItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 학력이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="💼" title="개인 경력" onEdit={edit}>{careerItems.length ? <ul className="space-y-2">{careerItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 경력이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="📍" title="수업 방식 / 레슨 지역" onEdit={edit}><div className="space-y-3"><span className="inline-flex rounded-full border-2 border-accent bg-orange-50 px-3 py-1 text-sm font-semibold text-accent">{lessonType || '수업 형태 미선택'}</span>{location && <div><p className="mb-2 text-xs text-blue-500">레슨 가능 지역</p><div className="flex flex-wrap gap-2">{location.split(',').map((item) => item.trim()).filter(Boolean).map((item) => <span key={item} className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground">{item}</span>)}</div></div>}</div></ProfileSection>
+        <ProfileSection icon="✨" title="수업 스타일" onEdit={edit}>{teachStyles.length ? <div className="flex flex-wrap gap-2">{teachStyles.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 수업 스타일이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="💰" title="레슨 가격" onEdit={edit}>{feeItems.length ? <div className="space-y-3">{feeItems.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3"><span className="text-sm font-semibold text-foreground">{item.type}</span><span className="text-sm font-bold text-accent">{Number(item.price.replace(/,/g, '')).toLocaleString('ko-KR')}원 / {item.duration}</span></div>)}</div> : empty('등록된 레슨 가격이 없습니다.')}</ProfileSection>
+        <button type="button" onClick={saveProfile} disabled={saveProfileMutation.isPending} className="w-full rounded-2xl bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-md transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer">{saveProfileMutation.isPending ? '저장 중...' : saved ? '프로필 저장 완료!' : '프로필 저장'}</button>
+        <p className="pb-4 text-center text-xs text-muted-foreground">프로필은 언제든지 수정할 수 있습니다.</p>
+      </div>
     );
   }
 
@@ -314,6 +415,7 @@ export default function TutorProfilePage() {
       onSuccess: () => {
         saveTutorProfile(profileData);
         setSaved(true);
+        setIsEditing(false);
         setTimeout(() => setSaved(false), 2000);
       },
     });
