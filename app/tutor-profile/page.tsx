@@ -251,8 +251,21 @@ export default function TutorProfilePage() {
       setTeachNote(profile.content ?? '');
       setTitle(profile.title ?? '');
       setIntro(profile.introduction ?? '');
+      if (profile.educations?.length) {
+        setEducations(profile.educations.map((text, index) => ({ id: index + 1, text })));
+      }
+      if (profile.experiences?.length) {
+        setCareers(profile.experiences.map((text, index) => ({ id: index + 1, text })));
+      }
+      if (profile.prices?.length) {
+        setFees(profile.prices.map((price, index) => ({
+          id: index + 1,
+          type: price.className ?? '',
+          duration: '60분',
+          price: String(price.price ?? ''),
+        })));
+      }
       setLessonType(profile.lessonType === 'OFFLINE' ? '대면 수업' : profile.lessonType === 'ONLINE' ? '온라인 수업' : profile.lessonType === 'BOTH' ? '둘 다 가능' : '');
-      setCareers(profile.career ? profile.career.split('\n').map((text, index) => ({ id: index + 1, text })) : [{ id: uid(), text: '' }]);
     });
   }, [categories, profileQuery.data, references, userName]);
 
@@ -323,7 +336,7 @@ export default function TutorProfilePage() {
       category,
       subjects: category.subjects.filter((subject) => subjects.includes(subject.description) || subjects.includes(subject.subjectName)),
     })).filter((item) => item.subjects.length > 0);
-    const edit = () => setIsEditing(true);
+    const edit = (section: string) => router.push(`/tutor-profile/setup?edit=profile&section=${section}`);
     const empty = (text: string) => <p className="text-sm italic text-muted-foreground">{text}</p>;
 
     return (
@@ -338,13 +351,13 @@ export default function TutorProfilePage() {
           </div>
         </ProfileSection>
         <ProfileSection icon="🎵" title="가르치는 악기 / 분야" onEdit={() => router.push('/tutor-profile/setup?edit=instruments')}>{teachingCategories.length ? <div className="space-y-4">{teachingCategories.map(({ category, subjects: categorySubjects }) => <div key={category.categoryId}><p className="mb-2 text-sm font-semibold text-foreground">{category.icon || '🎵'} {category.description || category.categoryName}</p><div className="flex flex-wrap gap-2">{categorySubjects.map((subject) => <span key={subject.subjectId} className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">{subject.description || subject.subjectName}</span>)}</div></div>)}</div> : empty('선택된 악기가 없습니다.')}</ProfileSection>
-        <ProfileSection icon="📝" title="레슨 소개" onEdit={edit}>{title || intro ? <div className="space-y-2"><p className="text-base font-semibold text-foreground">{title}</p><p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{intro}</p></div> : empty('레슨 소개가 없습니다.')}</ProfileSection>
-        <ProfileSection icon="🎯" title="레슨 목표" onEdit={edit}>{goals.length ? <div className="flex flex-wrap gap-2">{goals.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 레슨 목표가 없습니다.')}</ProfileSection>
-        <ProfileSection icon="🎓" title="학력" onEdit={edit}>{educationItems.length ? <ul className="space-y-2">{educationItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 학력이 없습니다.')}</ProfileSection>
-        <ProfileSection icon="💼" title="개인 경력" onEdit={edit}>{careerItems.length ? <ul className="space-y-2">{careerItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 경력이 없습니다.')}</ProfileSection>
-        <ProfileSection icon="📍" title="수업 방식 / 레슨 지역" onEdit={edit}><div className="space-y-3"><span className="inline-flex rounded-full border-2 border-accent bg-orange-50 px-3 py-1 text-sm font-semibold text-accent">{lessonType || '수업 형태 미선택'}</span>{location && <div><p className="mb-2 text-xs text-blue-500">레슨 가능 지역</p><div className="flex flex-wrap gap-2">{location.split(',').map((item) => item.trim()).filter(Boolean).map((item) => <span key={item} className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground">{item}</span>)}</div></div>}</div></ProfileSection>
-        <ProfileSection icon="✨" title="수업 스타일" onEdit={edit}>{teachStyles.length ? <div className="flex flex-wrap gap-2">{teachStyles.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 수업 스타일이 없습니다.')}</ProfileSection>
-        <ProfileSection icon="💰" title="레슨 가격" onEdit={edit}>{feeItems.length ? <div className="space-y-3">{feeItems.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3"><span className="text-sm font-semibold text-foreground">{item.type}</span><span className="text-sm font-bold text-accent">{Number(item.price.replace(/,/g, '')).toLocaleString('ko-KR')}원 / {item.duration}</span></div>)}</div> : empty('등록된 레슨 가격이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="📝" title="레슨 소개" onEdit={() => edit('introduction')}>{title || intro ? <div className="space-y-2"><p className="text-base font-semibold text-foreground">{title}</p><p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{intro}</p></div> : empty('레슨 소개가 없습니다.')}</ProfileSection>
+        <ProfileSection icon="🎯" title="레슨 목표" onEdit={() => edit('goals')}>{goals.length ? <div className="flex flex-wrap gap-2">{goals.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 레슨 목표가 없습니다.')}</ProfileSection>
+        <ProfileSection icon="🎓" title="학력" onEdit={() => edit('education')}>{educationItems.length ? <ul className="space-y-2">{educationItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 학력이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="💼" title="개인 경력" onEdit={() => edit('experience')}>{careerItems.length ? <ul className="space-y-2">{careerItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 경력이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="📍" title="수업 방식 / 레슨 지역" onEdit={() => edit('location')}><div className="space-y-3"><span className="inline-flex rounded-full border-2 border-accent bg-orange-50 px-3 py-1 text-sm font-semibold text-accent">{lessonType || '수업 형태 미선택'}</span>{location && <div><p className="mb-2 text-xs text-blue-500">레슨 가능 지역</p><div className="flex flex-wrap gap-2">{location.split(',').map((item) => item.trim()).filter(Boolean).map((item) => <span key={item} className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground">{item}</span>)}</div></div>}</div></ProfileSection>
+        <ProfileSection icon="✨" title="수업 스타일" onEdit={() => edit('styles')}>{teachStyles.length ? <div className="flex flex-wrap gap-2">{teachStyles.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 수업 스타일이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="💰" title="레슨 가격" onEdit={() => edit('prices')}>{feeItems.length ? <div className="space-y-3">{feeItems.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3"><span className="text-sm font-semibold text-foreground">{item.type}</span><span className="text-sm font-bold text-accent">{Number(item.price.replace(/,/g, '')).toLocaleString('ko-KR')}원 / {item.duration}</span></div>)}</div> : empty('등록된 레슨 가격이 없습니다.')}</ProfileSection>
         <button type="button" onClick={saveProfile} disabled={saveProfileMutation.isPending} className="w-full rounded-2xl bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-md transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer">{saveProfileMutation.isPending ? '저장 중...' : saved ? '프로필 저장 완료!' : '프로필 저장'}</button>
         <p className="pb-4 text-center text-xs text-muted-foreground">프로필은 언제든지 수정할 수 있습니다.</p>
       </div>

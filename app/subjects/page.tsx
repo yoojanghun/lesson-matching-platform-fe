@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCategoriesQuery } from "../hooks/queries/useCategories";
+import CategoryIcon from "../components/CategoryIcon";
 
 function SubjectsContent() {
   const router = useRouter();
@@ -74,7 +75,7 @@ function SubjectsContent() {
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                   }`}
                 >
-                  <span className="text-lg" aria-hidden="true">{category.icon}</span>
+                  <CategoryIcon code={category.code ?? category.categoryName} id={category.categoryId} className="h-6 w-6" />
                   <span>{category.description}</span>
                 </button>
               );

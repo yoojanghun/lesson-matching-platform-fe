@@ -6,6 +6,7 @@ import { queryKeys } from '../../lib/queryKeys';
 
 export interface ReferenceLocation {
   locationId: number;
+  parentId: number | null;
   name: string;
 }
 

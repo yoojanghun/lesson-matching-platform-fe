@@ -53,13 +53,18 @@ export interface TutorProfileResponse {
   emailPublic?: boolean;
   phoneNumberPublic?: boolean;
   title: string | null;
-  content: string | null;
   introduction: string | null;
-  career: string | null;
+  content?: string | null;
+  career?: string | null;
+  educations?: string[];
+  experiences?: string[];
+  prices?: Array<{ className?: string; price?: number }>;
+  lessonType?: 'ONLINE' | 'OFFLINE' | 'BOTH' | null;
   locations: ProfileLocationDto[];
   categories: ProfileCategoryDto[];
   subjects: ProfileSubjectDto[];
   styles: ProfileTypeDto[];
+  goals?: ProfileTypeDto[];
 }
 
 export interface StudentProfilePatchRequest {
@@ -87,6 +92,7 @@ export interface TutorProfilePatchRequest {
   subjectIds?: number[];
   locationIds?: number[];
   goalIds?: number[];
+  lessonType?: 'ONLINE' | 'OFFLINE' | 'BOTH';
   title?: string;
   experiences?: string[];
   educations?: string[];

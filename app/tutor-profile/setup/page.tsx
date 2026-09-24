@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useCategoriesQuery } from '../../hooks/queries/useCategories';
 import { useLocationsQuery, useReferencesQuery } from '../../hooks/queries/useReferences';
 import { useSaveTutorProfileMutation, useTutorProfileQuery } from '../../hooks/queries/useProfiles';
+import CategoryIcon from '../../components/CategoryIcon';
 
 interface PendingTutorSignup {
   name: string;
@@ -20,21 +21,6 @@ interface LessonPriceDraft {
   name: string;
   price: string;
 }
-
-const INSTRUMENTS = [
-  { name: '피아노', icon: '🎹' },
-  { name: '바이올린', icon: '🎻' },
-  { name: '첼로', icon: '🎻' },
-  { name: '기타', icon: '🎸' },
-  { name: '드럼', icon: '🥁' },
-  { name: '보컬', icon: '🎤' },
-  { name: '플루트', icon: '🎵' },
-  { name: '색소폰', icon: '🎷' },
-  { name: '우쿨렐레', icon: '🪕' },
-  { name: '베이스', icon: '🎸' },
-  { name: '작곡', icon: '🎼' },
-  { name: '하프', icon: '🎶' },
-];
 
 const GOAL_DESCRIPTIONS: Record<string, string> = {
   HOBBY: '즐기기 위해 배우고 싶어요',
@@ -58,14 +44,27 @@ const STYLE_DESCRIPTIONS: Record<string, string> = {
 export default function TutorProfileSetupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const editMode = searchParams.get('edit') === 'instruments';
-  const { data: categories, isLoading: categoriesLoading } = useCategoriesQuery();
+  const editType = searchParams.get('edit');
+  const editSection = searchParams.get('section');
+  const editMode = editType === 'instruments' || editType === 'profile';
+  const profileEditMode = editType === 'profile';
+  const initialStep = editSection === 'introduction' ? 3
+    : editSection === 'education' ? 4
+      : editSection === 'experience' ? 5
+        : editSection === 'lesson' ? 6
+          : editSection === 'location' ? 7
+            : editSection === 'goals' ? 8
+              : editSection === 'styles' ? 9
+                : editSection === 'prices' ? 10
+                  : 1;
+  const { data: categories, isLoading: categoriesLoading, isError: categoriesError } = useCategoriesQuery();
   const tutorProfileQuery = useTutorProfileQuery(editMode);
   const saveTutorProfileMutation = useSaveTutorProfileMutation();
-  const { data: locations = [], isLoading: locationsLoading, isError: locationsError } = useLocationsQuery();
   const { data: references, isLoading: referencesLoading, isError: referencesError } = useReferencesQuery();
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10>(1);
-  const [selectedInstruments, setSelectedInstruments] = useState<string[]>([]);
+  const { data: fallbackLocations = [], isLoading: fallbackLocationsLoading, isError: fallbackLocationsError } = useLocationsQuery(referencesError);
+  const locations = references?.locations ?? fallbackLocations;
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10>(initialStep as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [selectedSubjects, setSelectedSubjects] = useState<number[]>([]);
   const [title, setTitle] = useState('');
@@ -76,6 +75,7 @@ export default function TutorProfileSetupPage() {
   const [experienceInput, setExperienceInput] = useState('');
   const [lessonType, setLessonType] = useState<'ONLINE' | 'OFFLINE' | 'BOTH'>('ONLINE');
   const [selectedLocations, setSelectedLocations] = useState<number[]>([]);
+  const [expandedLocationIds, setExpandedLocationIds] = useState<number[]>([]);
   const [selectedGoals, setSelectedGoals] = useState<number[]>([]);
   const [selectedStyles, setSelectedStyles] = useState<number[]>([]);
   const [lessonPrices, setLessonPrices] = useState<LessonPriceDraft[]>([]);
@@ -92,30 +92,45 @@ export default function TutorProfileSetupPage() {
     const profileCategoryNames = profile.categories.map((category) => category.categoryType);
     const profileSubjectNames = profile.subjects.map((subject) => subject.subjectType);
     const matchedCategories = categories.filter((category) =>
-      profileCategoryNames.includes(category.categoryName) || profileCategoryNames.includes(category.description),
+      profileCategoryNames.includes(category.code ?? '') ||
+      profileCategoryNames.includes(category.categoryName) ||
+      profileCategoryNames.includes(category.description ?? ''),
     );
-    setSelectedInstruments(matchedCategories.map((category) => category.description));
-    setSelectedSubjects(matchedCategories.flatMap((category) => category.subjects)
-      .filter((subject) => profileSubjectNames.includes(subject.subjectName) || profileSubjectNames.includes(subject.description))
-      .map((subject) => subject.subjectId));
-    setActiveCategoryId(matchedCategories[0]?.categoryId ?? null);
-  }, [categories, editMode, tutorProfileQuery.data]);
+    startTransition(() => {
+      setSelectedCategoryIds(matchedCategories.map((category) => category.categoryId));
+      setSelectedSubjects(matchedCategories.flatMap((category) => category.subjects)
+        .filter((subject) => profileSubjectNames.includes(subject.subjectName) || profileSubjectNames.includes(subject.description ?? ''))
+        .map((subject) => subject.subjectId));
+      setActiveCategoryId(matchedCategories[0]?.categoryId ?? null);
+      if (profileEditMode) {
+        setTitle(profile.title ?? '');
+        setIntroduction(profile.introduction ?? '');
+        setEducations(profile.educations ?? []);
+        setExperiences(profile.experiences ?? (profile.career ? profile.career.split('\n') : []));
+        setLessonType(profile.lessonType ?? 'ONLINE');
+        setSelectedLocations(profile.locations.map((location) => location.locationId));
+        setSelectedStyles(profile.styles.map((style) => style.id).filter((id): id is number => id !== undefined));
+        setSelectedGoals((profile.goals ?? []).map((goal) => goal.goalId).filter((id): id is number => id !== undefined));
+        setLessonPrices((profile.prices ?? []).map((price, index) => ({
+          id: index + 1,
+          name: price.className ?? '',
+          price: String(price.price ?? ''),
+        })));
+      }
+    });
+  }, [categories, editMode, profileEditMode, tutorProfileQuery.data]);
 
-  const toggleInstrument = (instrument: string) => {
-    setSelectedInstruments((current) =>
-      current.includes(instrument)
-        ? current.filter((item) => item !== instrument)
-        : [...current, instrument],
+  const toggleCategory = (categoryId: number) => {
+    setSelectedCategoryIds((current) =>
+      current.includes(categoryId)
+        ? current.filter((id) => id !== categoryId)
+        : [...current, categoryId],
     );
   };
 
   const completeInstrumentEdit = () => {
     if (!categories) return;
-    const matchedCategories = categories.filter((category) =>
-      selectedInstruments.some((instrument) =>
-        category.description === instrument || category.categoryName === instrument,
-      ),
-    );
+    const matchedCategories = categories.filter((category) => selectedCategoryIds.includes(category.categoryId));
     const categoryIds = matchedCategories.map((category) => category.categoryId);
     const subjectIds = selectedSubjects.filter((subjectId) =>
       matchedCategories.some((category) => category.subjects.some((subject) => subject.subjectId === subjectId)),
@@ -134,27 +149,22 @@ export default function TutorProfileSetupPage() {
     setErrorMessage('');
 
     const pendingSignup = sessionStorage.getItem('pending-tutor-signup');
-    if (!pendingSignup) {
+    if (!profileEditMode && !pendingSignup) {
       setErrorMessage('기본 회원가입 정보가 없습니다. 회원가입을 처음부터 다시 진행해 주세요.');
       return;
     }
 
-    if (!categories || categoriesLoading || locationsLoading || referencesLoading) {
+    if (!categories || categoriesLoading || referencesLoading) {
       setErrorMessage('악기, 지역, 레슨 목표와 수업 스타일 정보를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');
       return;
     }
 
-    if (locationsError || referencesError || !references) {
+    if (referencesError || !references) {
       setErrorMessage('레슨 가능 지역, 목표 또는 수업 스타일을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
       return;
     }
 
-    const matchedCategories = categories.filter((category) =>
-      selectedInstruments.some((instrument) =>
-        category.description === instrument || category.categoryName === instrument ||
-        category.subjects.some((subject) => subject.description === instrument || subject.subjectName === instrument),
-      ),
-    );
+    const matchedCategories = categories.filter((category) => selectedCategoryIds.includes(category.categoryId));
     const categoryIds = matchedCategories.map((category) => category.categoryId);
     const subjectIds = selectedSubjects.filter((subjectId) =>
       matchedCategories.some((category) => category.subjects.some((subject) => subject.subjectId === subjectId)),
@@ -169,6 +179,34 @@ export default function TutorProfileSetupPage() {
     if (subjectIds.length === 0) {
       setErrorMessage('악기의 세부 분야를 하나 이상 선택해 주세요.');
       setStep(2);
+      return;
+    }
+
+    if (profileEditMode) {
+      saveTutorProfileMutation.mutate({
+        categoryIds,
+        subjectIds,
+        title: title.trim(),
+        introduction: introduction.trim(),
+        lessonType,
+        educations,
+        experiences,
+        locationIds: lessonType === 'ONLINE' ? [] : selectedLocations,
+        styleIds: selectedStyles,
+        goalIds: selectedGoals,
+        prices: lessonPrices.map(({ name, price }) => ({
+          className: name.trim(),
+          price: Number(price),
+        })),
+      }, {
+        onSuccess: () => router.push('/tutor-profile'),
+        onError: () => setErrorMessage('프로필 저장에 실패했습니다. 입력 내용을 확인해 주세요.'),
+      });
+      return;
+    }
+
+    if (!pendingSignup) {
+      setErrorMessage('기본 회원가입 정보가 없습니다. 회원가입을 처음부터 다시 진행해 주세요.');
       return;
     }
 
@@ -195,8 +233,7 @@ export default function TutorProfileSetupPage() {
         styleIds: selectedStyles,
         goalIds: selectedGoals,
         lessonPriceDtos: lessonPrices.map(({ name, price }) => ({
-          type: name.trim(),
-          duration: '월',
+          className: name.trim(),
           price: Number(price),
         })),
       });
@@ -257,13 +294,16 @@ export default function TutorProfileSetupPage() {
     return Number.isNaN(numericPrice) ? price : numericPrice.toLocaleString('ko-KR');
   };
 
-  const selectedCategories = (categories ?? []).filter((category) =>
-    selectedInstruments.some((instrument) =>
-      category.description === instrument || category.categoryName === instrument ||
-      category.subjects.some((subject) => subject.description === instrument || subject.subjectName === instrument),
-    ),
-  );
+  const selectedCategories = (categories ?? []).filter((category) => selectedCategoryIds.includes(category.categoryId));
   const activeCategory = selectedCategories.find((category) => category.categoryId === activeCategoryId) ?? selectedCategories[0];
+  const locationGroups = locations
+    .filter((location) => location.parentId === null)
+    .map((parent) => ({
+      parent,
+      wholeLocation: locations.find((location) => location.parentId === parent.locationId && location.name === `${parent.name} 전체`) ?? parent,
+      children: locations.filter((location) => location.parentId === parent.locationId && location.name !== `${parent.name} 전체`),
+    }));
+  const hasLocationGroups = locationGroups.length > 0;
 
   const stepLabels = ['악기 선택', '악기 세부', '레슨 소개', '학력', '경력', '수업 방식', '레슨 지역', '레슨 목표', '수업 스타일', '레슨 가격'];
   const visibleStepStart = step <= 3 ? 0 : step >= 9 ? 7 : step >= 8 ? 6 : step >= 6 ? 4 : 1;
@@ -297,27 +337,33 @@ export default function TutorProfileSetupPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">가르칠 악기를 선택하세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">중복 선택 가능합니다</p>
 
+          {categoriesLoading ? (
+            <p className="mt-7 rounded-xl border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">가르칠 악기 정보를 불러오는 중입니다.</p>
+          ) : categoriesError ? (
+            <p className="mt-7 rounded-xl border border-red-200 bg-red-50 px-4 py-8 text-center text-sm text-red-600">악기 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+          ) : (
           <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-            {INSTRUMENTS.map((instrument) => {
-              const selected = selectedInstruments.includes(instrument.name);
+            {(categories ?? []).map((category) => {
+              const selected = selectedCategoryIds.includes(category.categoryId);
               return (
                 <button
-                  key={instrument.name}
+                  key={category.categoryId}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => toggleInstrument(instrument.name)}
+                  onClick={() => toggleCategory(category.categoryId)}
                   className={`flex aspect-[1.15] flex-col items-center justify-center gap-2 rounded-xl border-2 bg-card text-sm transition-colors cursor-pointer ${
                     selected
                       ? 'border-accent bg-accent/5 text-accent'
                       : 'border-border text-foreground hover:border-accent/50'
                   }`}
                 >
-                  <span className="text-2xl" aria-hidden="true">{instrument.icon}</span>
-                  <span className="font-medium">{instrument.name}</span>
+                  <CategoryIcon code={category.code ?? category.categoryName} id={category.categoryId} className="h-10 w-10" />
+                  <span className="font-medium">{category.description || category.categoryName}</span>
                 </button>
               );
             })}
           </div>
+          )}
 
           <div className="mt-10 flex gap-3">
             <button type="button" onClick={() => router.push(editMode ? '/tutor-profile' : '/signup')} className="h-13 flex-1 rounded-xl border-2 border-border bg-card text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer">
@@ -325,10 +371,10 @@ export default function TutorProfileSetupPage() {
             </button>
             <button
               type="button"
-              disabled={selectedInstruments.length === 0}
+              disabled={selectedCategoryIds.length === 0}
               onClick={() => {
                 setActiveCategoryId(selectedCategories[0]?.categoryId ?? null);
-                if (editMode) completeInstrumentEdit();
+                if (editType === 'instruments') completeInstrumentEdit();
                 else setStep(2);
               }}
               className="h-13 flex-[1.8] rounded-xl bg-accent text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer"
@@ -352,7 +398,7 @@ export default function TutorProfileSetupPage() {
                   onClick={() => setActiveCategoryId(category.categoryId)}
                   className={`rounded-full border-2 px-5 py-2 text-sm font-semibold transition-colors cursor-pointer ${selected ? 'border-accent bg-accent/5 text-accent' : 'border-border bg-card text-muted-foreground hover:border-accent/50'}`}
                 >
-                  <span className="mr-1" aria-hidden="true">{category.icon || '🎵'}</span>{category.description || category.categoryName}
+                  <CategoryIcon code={category.code ?? category.categoryName} id={category.categoryId} className="mr-1 inline-block h-5 w-5 align-middle" />{category.description || category.categoryName}
                 </button>
               );
             })}
@@ -515,22 +561,77 @@ export default function TutorProfileSetupPage() {
               {lessonType === 'ONLINE' && <span className="text-xs font-normal text-muted-foreground">온라인 수업은 지역을 선택하지 않습니다</span>}
             </div>
             <div className="max-h-96 overflow-y-auto">
-              {locations.map((location) => {
-                const selected = selectedLocations.includes(location.locationId);
-                return (
-                  <button
-                    key={location.locationId}
-                    type="button"
-                    disabled={lessonType === 'ONLINE'}
-                    aria-pressed={selected}
-                    onClick={() => setSelectedLocations((current) => selected ? current.filter((id) => id !== location.locationId) : [...current, location.locationId])}
-                    className={`flex w-full items-center justify-between border-b border-border px-5 py-4 text-left text-sm transition-colors last:border-b-0 ${selected ? 'bg-accent/10 font-semibold text-accent' : 'text-foreground hover:bg-muted'} disabled:cursor-not-allowed`}
-                  >
-                    <span>{location.name}</span>
-                    <span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${selected ? 'border-accent bg-accent text-white' : 'border-border'}`} aria-hidden="true">{selected ? <Check size={13} /> : null}</span>
-                  </button>
-                );
-              })}
+              {(referencesLoading && !locations.length) || fallbackLocationsLoading ? (
+                <p className="px-5 py-8 text-center text-sm text-muted-foreground">레슨 가능 지역을 불러오는 중입니다.</p>
+              ) : referencesError && fallbackLocationsError && !locations.length ? (
+                <p className="px-5 py-8 text-center text-sm text-red-500">레슨 가능 지역을 불러오지 못했습니다.</p>
+              ) : hasLocationGroups ? (
+                locationGroups.map(({ parent, wholeLocation, children }) => {
+                  const expanded = expandedLocationIds.includes(parent.locationId);
+                  const selected = selectedLocations.includes(wholeLocation.locationId);
+                  const hasSelectedChild = children.some((location) => selectedLocations.includes(location.locationId));
+                  return (
+                    <div key={parent.locationId} className="border-b border-border last:border-b-0">
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        onClick={() => setExpandedLocationIds((current) => expanded ? current.filter((id) => id !== parent.locationId) : [...current, parent.locationId])}
+                        className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                      >
+                        <span>{parent.name}</span>
+                        <ChevronDown size={18} className={`text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+                      </button>
+                      {expanded && (
+                        <div className="border-t border-border">
+                          <button
+                            type="button"
+                            disabled={lessonType === 'ONLINE' || hasSelectedChild}
+                            aria-pressed={selected}
+                            onClick={() => setSelectedLocations((current) => selected ? current.filter((id) => id !== wholeLocation.locationId) : [...current, wholeLocation.locationId])}
+                            className={`flex w-full items-center justify-between px-8 py-4 text-left text-sm transition-colors ${selected ? 'bg-accent/10 font-semibold text-accent' : hasSelectedChild ? 'cursor-not-allowed text-muted-foreground/60' : 'text-foreground hover:bg-muted'} disabled:cursor-not-allowed`}
+                          >
+                            <span>{wholeLocation.name === parent.name ? `${parent.name} 전체` : wholeLocation.name}</span>
+                            <span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${selected ? 'border-accent bg-accent text-white' : 'border-border'}`} aria-hidden="true">{selected ? <Check size={13} /> : null}</span>
+                          </button>
+                          {children.map((location) => {
+                            const childSelected = selectedLocations.includes(location.locationId);
+                            return (
+                              <button
+                                key={location.locationId}
+                                type="button"
+                                disabled={lessonType === 'ONLINE' || selected}
+                                aria-pressed={childSelected}
+                                onClick={() => setSelectedLocations((current) => childSelected ? current.filter((id) => id !== location.locationId) : [...current, location.locationId])}
+                                className={`flex w-full items-center justify-between border-t border-border px-10 py-4 text-left text-sm transition-colors ${childSelected ? 'bg-accent/10 font-semibold text-accent' : selected ? 'cursor-not-allowed text-muted-foreground/60' : 'text-foreground hover:bg-muted'} disabled:cursor-not-allowed`}
+                              >
+                                <span>{location.name}</span>
+                                <span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${childSelected ? 'border-accent bg-accent text-white' : 'border-border'}`} aria-hidden="true">{childSelected ? <Check size={13} /> : null}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                locations.map((location) => {
+                  const selected = selectedLocations.includes(location.locationId);
+                  return (
+                    <button
+                      key={location.locationId}
+                      type="button"
+                      disabled={lessonType === 'ONLINE'}
+                      aria-pressed={selected}
+                      onClick={() => setSelectedLocations((current) => selected ? current.filter((id) => id !== location.locationId) : [...current, location.locationId])}
+                      className={`flex w-full items-center justify-between border-b border-border px-5 py-4 text-left text-sm transition-colors last:border-b-0 ${selected ? 'bg-accent/10 font-semibold text-accent' : 'text-foreground hover:bg-muted'} disabled:cursor-not-allowed`}
+                    >
+                      <span>{location.name}</span>
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${selected ? 'border-accent bg-accent text-white' : 'border-border'}`} aria-hidden="true">{selected ? <Check size={13} /> : null}</span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -574,7 +675,7 @@ export default function TutorProfileSetupPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">수업 스타일을 선택해주세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">선택 사항이며, 중복 선택 가능합니다</p>
 
-          <div className="mt-7 grid max-h-[28rem] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+          <div className="mt-7 grid max-h-112 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
             {(references?.tutorStyles ?? []).map((style) => {
               const selected = selectedStyles.includes(style.id);
               const styleIcons: Record<string, string> = {
@@ -628,7 +729,7 @@ export default function TutorProfileSetupPage() {
                       <input id="lesson-price-value" inputMode="numeric" value={priceValue ? formatPrice(priceValue) : ''} onChange={(event) => setPriceValue(event.target.value.replace(/[^0-9]/g, ''))} placeholder="100,000" className="h-12 w-full rounded-xl border-2 border-border bg-card px-4 pr-10 text-sm text-foreground outline-none focus:border-accent" />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">원</span>
                     </div>
-                    {priceValue && <p className="mt-1 text-xs text-accent">{formatPrice(priceValue)}원 / 월</p>}
+                    {priceValue && <p className="mt-1 text-xs text-accent">{formatPrice(priceValue)}원 / 회</p>}
                   </div>
                   <div className="flex gap-2 pt-1">
                     <button type="button" onClick={closePriceModal} className="flex-1 rounded-xl border-2 border-border py-3 text-sm font-medium text-muted-foreground hover:bg-muted cursor-pointer">취소</button>
@@ -660,7 +761,7 @@ export default function TutorProfileSetupPage() {
                   {lessonPrices.map((price, index) => (
                     <li key={price.id} className="flex items-center gap-3 px-5 py-4">
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">{index + 1}</span>
-                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">{price.name}</p><p className="text-xs text-muted-foreground">{formatPrice(price.price)}원 / 월</p></div>
+                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">{price.name}</p><p className="text-xs text-muted-foreground">{formatPrice(price.price)}원 / 회</p></div>
                       <button type="button" onClick={() => openPriceModal(price)} className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-accent cursor-pointer">수정</button>
                       <button type="button" onClick={() => setLessonPrices((current) => current.filter((item) => item.id !== price.id))} className="rounded px-2 py-1 text-base leading-none text-muted-foreground hover:bg-red-50 hover:text-red-400 cursor-pointer" aria-label={`${price.name} 삭제`}>×</button>
                     </li>
