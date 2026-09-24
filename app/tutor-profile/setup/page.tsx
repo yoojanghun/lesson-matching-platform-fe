@@ -58,8 +58,10 @@ export default function TutorProfileSetupPage() {
   const { data: categories, isLoading: categoriesLoading } = useCategoriesQuery();
   const { data: locations = [], isLoading: locationsLoading, isError: locationsError } = useLocationsQuery();
   const { data: references, isLoading: referencesLoading, isError: referencesError } = useReferencesQuery();
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10>(1);
   const [selectedInstruments, setSelectedInstruments] = useState<string[]>([]);
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
+  const [selectedSubjects, setSelectedSubjects] = useState<number[]>([]);
   const [title, setTitle] = useState('');
   const [introduction, setIntroduction] = useState('');
   const [educations, setEducations] = useState<string[]>([]);
@@ -112,11 +114,19 @@ export default function TutorProfileSetupPage() {
       ),
     );
     const categoryIds = matchedCategories.map((category) => category.categoryId);
-    const subjectIds = matchedCategories.flatMap((category) => category.subjects.map((subject) => subject.subjectId));
+    const subjectIds = selectedSubjects.filter((subjectId) =>
+      matchedCategories.some((category) => category.subjects.some((subject) => subject.subjectId === subjectId)),
+    );
 
-    if (categoryIds.length === 0 || subjectIds.length === 0) {
+    if (categoryIds.length === 0) {
       setErrorMessage('선택한 악기 정보를 찾지 못했습니다. 악기를 다시 선택해 주세요.');
       setStep(1);
+      return;
+    }
+
+    if (subjectIds.length === 0) {
+      setErrorMessage('악기의 세부 분야를 하나 이상 선택해 주세요.');
+      setStep(2);
       return;
     }
 
@@ -205,8 +215,16 @@ export default function TutorProfileSetupPage() {
     return Number.isNaN(numericPrice) ? price : numericPrice.toLocaleString('ko-KR');
   };
 
-  const stepLabels = ['악기 선택', '레슨 소개', '학력', '경력', '수업 방식', '레슨 지역', '레슨 목표', '수업 스타일', '레슨 가격'];
-  const visibleStepStart = step <= 2 ? 0 : step >= 8 ? 6 : step >= 7 ? 5 : step >= 5 ? 3 : 1;
+  const selectedCategories = (categories ?? []).filter((category) =>
+    selectedInstruments.some((instrument) =>
+      category.description === instrument || category.categoryName === instrument ||
+      category.subjects.some((subject) => subject.description === instrument || subject.subjectName === instrument),
+    ),
+  );
+  const activeCategory = selectedCategories.find((category) => category.categoryId === activeCategoryId) ?? selectedCategories[0];
+
+  const stepLabels = ['악기 선택', '악기 세부', '레슨 소개', '학력', '경력', '수업 방식', '레슨 지역', '레슨 목표', '수업 스타일', '레슨 가격'];
+  const visibleStepStart = step <= 3 ? 0 : step >= 9 ? 7 : step >= 8 ? 6 : step >= 6 ? 4 : 1;
   const visibleSteps = stepLabels.slice(visibleStepStart, visibleStepStart + 3);
 
   return (
@@ -266,7 +284,10 @@ export default function TutorProfileSetupPage() {
             <button
               type="button"
               disabled={selectedInstruments.length === 0}
-              onClick={() => setStep(2)}
+              onClick={() => {
+                setActiveCategoryId(selectedCategories[0]?.categoryId ?? null);
+                setStep(2);
+              }}
               className="h-13 flex-[1.8] rounded-xl bg-accent text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer"
             >
               다음
@@ -274,6 +295,51 @@ export default function TutorProfileSetupPage() {
           </div>
         </section>
       ) : step === 2 ? (
+        <section>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">악기별 장르를 선택해주세요</h1>
+          <p className="mt-2 text-sm text-muted-foreground">중복 선택 가능합니다</p>
+
+          <div className="mt-7 flex flex-wrap gap-2">
+            {selectedCategories.map((category) => {
+              const selected = activeCategory?.categoryId === category.categoryId;
+              return (
+                <button
+                  key={category.categoryId}
+                  type="button"
+                  onClick={() => setActiveCategoryId(category.categoryId)}
+                  className={`rounded-full border-2 px-5 py-2 text-sm font-semibold transition-colors cursor-pointer ${selected ? 'border-accent bg-accent/5 text-accent' : 'border-border bg-card text-muted-foreground hover:border-accent/50'}`}
+                >
+                  <span className="mr-1" aria-hidden="true">{category.icon || '🎵'}</span>{category.description || category.categoryName}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="mt-7 text-sm font-semibold text-muted-foreground">{activeCategory?.description || activeCategory?.categoryName} 장르</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {(activeCategory?.subjects ?? []).map((subject) => {
+              const selected = selectedSubjects.includes(subject.subjectId);
+              return (
+                <button
+                  key={subject.subjectId}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setSelectedSubjects((current) => selected ? current.filter((id) => id !== subject.subjectId) : [...current, subject.subjectId])}
+                  className={`rounded-xl border-2 bg-card px-3 py-3 text-sm font-medium transition-colors cursor-pointer ${selected ? 'border-accent bg-accent/5 text-accent' : 'border-border text-foreground hover:border-accent/50'}`}
+                >
+                  {subject.description || subject.subjectName}
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedSubjects.length === 0 && <p className="mt-4 text-xs text-muted-foreground">세부 분야를 하나 이상 선택해주세요.</p>}
+          <div className="mt-10 flex gap-3">
+            <button type="button" onClick={() => setStep(1)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button>
+            <button type="button" disabled={selectedSubjects.length === 0} onClick={() => setStep(3)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">다음</button>
+          </div>
+        </section>
+      ) : step === 3 ? (
         <section>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">레슨을 소개해주세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">학생들이 레슨을 선택하는 데 도움이 됩니다</p>
@@ -310,20 +376,20 @@ export default function TutorProfileSetupPage() {
           {errorMessage && <p className="mt-5 text-sm text-red-500">{errorMessage}</p>}
 
           <div className="mt-9 flex gap-3">
-            <button type="button" onClick={() => setStep(1)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer">
+            <button type="button" onClick={() => setStep(2)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer">
               <span className="inline-flex items-center gap-1"><ArrowLeft size={15} /> 이전</span>
             </button>
             <button
               type="button"
               disabled={!title.trim() || !introduction.trim() || submitting}
-              onClick={() => setStep(3)}
+              onClick={() => setStep(4)}
               className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer"
             >
               다음
             </button>
           </div>
         </section>
-      ) : step === 3 ? (
+      ) : step === 4 ? (
         <section>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">학력을 입력해주세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">선택 사항입니다. 입력하지 않아도 됩니다.</p>
@@ -347,9 +413,9 @@ export default function TutorProfileSetupPage() {
               </>
               )}
           </div>
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(2)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(4)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(3)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(5)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
         </section>
-      ) : step === 4 ? (
+      ) : step === 5 ? (
         <section>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">경력을 입력해주세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">선택 사항입니다. 입력하지 않아도 됩니다.</p>
@@ -373,9 +439,9 @@ export default function TutorProfileSetupPage() {
               </>
               )}
           </div>
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(3)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(5)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(4)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(6)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
         </section>
-      ) : step === 5 ? (
+      ) : step === 6 ? (
         <section>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">수업 방식을 선택해주세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">학생들이 레슨 신청 전 확인하는 정보입니다.</p>
@@ -393,9 +459,9 @@ export default function TutorProfileSetupPage() {
             ))}
           </div>
           {errorMessage && <p className="mt-5 text-sm text-red-500">{errorMessage}</p>}
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(4)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(6)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(5)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(7)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
         </section>
-      ) : step === 6 ? (
+      ) : step === 7 ? (
         <section>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">레슨 가능한 지역을 선택해주세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">복수 선택 가능합니다</p>
@@ -427,9 +493,9 @@ export default function TutorProfileSetupPage() {
 
           {lessonType !== 'ONLINE' && selectedLocations.length === 0 && <p className="mt-3 text-xs text-muted-foreground">대면 수업이 가능한 지역을 하나 이상 선택해주세요.</p>}
           {errorMessage && <p className="mt-5 text-sm text-red-500">{errorMessage}</p>}
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(5)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" disabled={lessonType !== 'ONLINE' && selectedLocations.length === 0} onClick={() => setStep(7)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(6)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" disabled={lessonType !== 'ONLINE' && selectedLocations.length === 0} onClick={() => setStep(8)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">다음</button></div>
         </section>
-      ) : step === 7 ? (
+      ) : step === 8 ? (
         <section>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">레슨 목표를 선택해주세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">선택 사항이며, 중복 선택 가능합니다</p>
@@ -458,9 +524,9 @@ export default function TutorProfileSetupPage() {
           </div>
 
           {referencesError && <p className="mt-5 text-sm text-red-500">레슨 목표를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>}
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(6)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(8)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(7)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(9)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
         </section>
-      ) : step === 8 ? (
+      ) : step === 9 ? (
         <section>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">수업 스타일을 선택해주세요</h1>
           <p className="mt-2 text-sm text-muted-foreground">선택 사항이며, 중복 선택 가능합니다</p>
@@ -497,7 +563,7 @@ export default function TutorProfileSetupPage() {
           </div>
 
           {referencesError && <p className="mt-5 text-sm text-red-500">수업 스타일을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>}
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(7)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(9)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(8)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(10)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
         </section>
       ) : (
         <section className="relative">
@@ -563,7 +629,7 @@ export default function TutorProfileSetupPage() {
             )}
 
             {lessonPrices.length === 3 && <p className="mt-4 text-center text-xs text-muted-foreground">최대 3개까지 등록 가능합니다. (3/3)</p>}
-            <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(8)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" disabled={submitting} onClick={finishSetup} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">{submitting ? '가입 처리 중...' : '등록 완료'}</button></div>
+            <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(9)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" disabled={submitting} onClick={finishSetup} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">{submitting ? '가입 처리 중...' : '등록 완료'}</button></div>
           </div>
         </section>
       )}
