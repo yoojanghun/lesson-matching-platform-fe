@@ -2,7 +2,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '../../lib/queryKeys';
-import { TUTORS } from '../../data/mockData';
 import type { Tutor } from '../../types';
 import { apiClient } from '../../lib/apiClient';
 
@@ -106,38 +105,28 @@ function displayStyle(value?: string, desc?: string) {
   return STYLE_LABELS[value] ?? value;
 }
 
-function fallbackTutor(tutorId: number) {
-  return TUTORS.find((tutor) => tutor.id === tutorId);
-}
-
 function toTutor(response: TutorCardResponse): Tutor {
-  const fallback = fallbackTutor(response.tutorId);
   const subjects = response.subjectTypeDtoList?.map((item) => displaySubject(item.subjectType)).filter(Boolean) as string[] | undefined;
   const categories = response.categoryTypeDtoList?.map((item) => displayCategory(item.categoryType)).filter(Boolean) as string[] | undefined;
   const displaySubjects = [...new Set([...(categories ?? []), ...(subjects ?? [])])];
-  const minPrice = response.priceRange?.minPrice ?? fallback?.price ?? 0;
 
   return {
     id: response.tutorId,
     name: response.name,
-    title: response.title ?? fallback?.title,
-    subject: displaySubjects.join(' · ') || fallback?.subject || '음악 레슨',
+    title: response.title ?? undefined,
+    subject: displaySubjects.join(' · '),
     lessonGoals: response.goalTypeDtoList?.map((item) => item.lessonGoalType).filter(Boolean) as string[] | undefined,
-    rating: response.averageRating ?? fallback?.rating ?? 0,
-    reviews: response.reviewCount ?? fallback?.reviews ?? 0,
-    price: minPrice,
-    tags: subjects ?? fallback?.tags ?? [],
-    intro: response.title ?? fallback?.intro ?? '맞춤형 레슨을 제공합니다.',
-    avatar: fallback?.avatar ?? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&auto=format',
-    available: fallback?.available ?? true,
-    location: fallback?.location,
-    lessonLocations: fallback?.lessonLocations,
-    onlineAvailable: fallback?.onlineAvailable,
+    rating: response.averageRating ?? 0,
+    reviews: response.reviewCount ?? 0,
+    price: response.priceRange?.minPrice ?? 0,
+    tags: subjects ?? [],
+    intro: response.title ?? '',
+    avatar: '/icons/categories/music.svg',
+    available: true,
   };
 }
 
 function toTutorFromProfile(response: TutorProfileResponse): Tutor {
-  const fallback = fallbackTutor(response.tutorId);
   const subjects = response.subjects?.map((item) => displaySubject(item.subjectType)).filter(Boolean) as string[] | undefined;
   const categories = response.categories?.map((item) => displayCategory(item.categoryType)).filter(Boolean) as string[] | undefined;
   const displaySubjects = [...new Set([...(categories ?? []), ...(subjects ?? [])])];
@@ -151,17 +140,17 @@ function toTutorFromProfile(response: TutorProfileResponse): Tutor {
         title: exp,
         org: '',
       }))
-    : fallback?.careers;
+    : undefined;
 
   // 백엔드 data.sql의 수업 스타일 (styles)
   const styles = response.styles && response.styles.length > 0
     ? response.styles.map((s) => displayStyle(s.styleType, s.description)).filter(Boolean) as string[]
-    : fallback?.lessonStyle;
+    : undefined;
 
   // 백엔드 data.sql의 레슨 목표 (goals)
   const goals = response.goals && response.goals.length > 0
     ? (response.goals.map((g) => g.lessonGoalType).filter(Boolean) as string[])
-    : fallback?.lessonGoals;
+    : undefined;
 
   // 백엔드 data.sql의 레슨비 (prices)
   const lessonOptions = response.prices && response.prices.length > 0
@@ -170,34 +159,34 @@ function toTutorFromProfile(response: TutorProfileResponse): Tutor {
         duration: '60분',
         price: p.price ?? 0,
       }))
-    : fallback?.lessonOptions;
+    : undefined;
 
   return {
     id: response.tutorId,
     name: response.name,
-    title: response.title ?? fallback?.title,
-    subject: displaySubjects.join(' · ') || fallback?.subject || '음악 레슨',
-    rating: fallback?.rating ?? 0,
-    reviews: fallback?.reviews ?? 0,
-    price: prices[0] ?? fallback?.price ?? 0,
-    tags: subjects?.length ? subjects : (fallback?.tags ?? []),
-    intro: response.introduction ?? response.title ?? fallback?.intro ?? '맞춤형 레슨을 제공합니다.',
-    fullIntro: response.introduction ?? fallback?.fullIntro,
-    avatar: fallback?.avatar ?? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&auto=format',
-    available: fallback?.available ?? true,
-    lessonLocations: locations?.length ? locations : fallback?.lessonLocations,
-    location: locations?.[0] ?? fallback?.location,
+    title: response.title ?? undefined,
+    subject: displaySubjects.join(' · '),
+    rating: 0,
+    reviews: 0,
+    price: prices[0] ?? 0,
+    tags: subjects ?? [],
+    intro: response.introduction ?? response.title ?? '',
+    fullIntro: response.introduction ?? undefined,
+    avatar: '/icons/categories/music.svg',
+    available: true,
+    lessonLocations: locations,
+    location: locations?.[0],
     lessonOptions,
     lessonGoals: goals,
     lessonStyle: styles,
-    education: response.educations && response.educations.length > 0 ? response.educations : fallback?.education,
+    education: response.educations && response.educations.length > 0 ? response.educations : undefined,
     careers,
-    birthDate: response.birthDate ?? fallback?.birthDate,
-    email: response.email ?? fallback?.email,
-    phoneNumber: response.phoneNumber ?? fallback?.phoneNumber,
-    birthDatePublic: response.isBirthDatePublic ?? fallback?.birthDatePublic,
-    emailPublic: response.isEmailPublic ?? fallback?.emailPublic,
-    phoneNumberPublic: response.isPhoneNumberPublic ?? fallback?.phoneNumberPublic,
+    birthDate: response.birthDate ?? undefined,
+    email: response.email ?? undefined,
+    phoneNumber: response.phoneNumber ?? undefined,
+    birthDatePublic: response.isBirthDatePublic ?? false,
+    emailPublic: response.isEmailPublic ?? false,
+    phoneNumberPublic: response.isPhoneNumberPublic ?? false,
   };
 }
 

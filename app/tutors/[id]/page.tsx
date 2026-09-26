@@ -17,21 +17,12 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { TUTORS, REVIEWS as INITIAL_REVIEWS } from '../../data/mockData';
 import StarRow from '../../components/StarRow';
 import { useUserStore } from '../../store/useUserStore';
 import { useTutorDetailQuery } from '../../hooks/queries/useTutors';
 import { useReviewsQuery, useCreateReviewMutation } from '../../hooks/queries/useReviews';
 import { FloatingChat } from '../../components/ChatPanel';
 
-const RATING_DIST = [
-  { star: 5, count: 71 },
-  { star: 4, count: 12 },
-  { star: 3, count: 3 },
-  { star: 2, count: 1 },
-  { star: 1, count: 0 },
-];
-const TOTAL_RATINGS = RATING_DIST.reduce((s, r) => s + r.count, 0);
 const DISPLAYABLE_LESSON_GOALS = [
   { label: '취미', values: ['취미', '취미 / 여가', 'HOBBY'] },
   { label: '입시', values: ['입시', '입시 / 진학', 'EXAM'] },
@@ -46,11 +37,24 @@ export default function TutorDetailPage() {
   const role = useUserStore((s) => s.role);
 
   // TanStack Query로 튜터 상세 및 리뷰 데이터 조회 (자동 캐싱)
-  const { data: tutorQueryData, isLoading: tutorLoading } = useTutorDetailQuery(tutorId);
+  const { data: tutorQueryData, isLoading: tutorLoading, isError: tutorError } = useTutorDetailQuery(tutorId);
   const { data: reviews = [] } = useReviewsQuery(tutorId, role !== 'GUEST');
   const createReviewMutation = useCreateReviewMutation();
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [activeSections, setActiveSections] = useState<Set<string>>(() => new Set(['edu', 'career']));
 
-  const tutor = tutorQueryData ?? TUTORS.find((t) => t.id === tutorId) ?? TUTORS[0];
+  if (tutorLoading) {
+    return <div className="py-20 text-center text-sm text-muted-foreground">튜터 정보를 불러오는 중입니다.</div>;
+  }
+
+  if (tutorError || !tutorQueryData) {
+    return <div className="py-20 text-center text-sm text-muted-foreground">튜터 정보를 찾을 수 없습니다.</div>;
+  }
+
+  const tutor = tutorQueryData;
   const lessonGoals = DISPLAYABLE_LESSON_GOALS
     .filter(({ values }) => tutor.lessonGoals?.some((goal) => values.includes(goal)))
     .map(({ label }) => label);
@@ -79,14 +83,13 @@ export default function TutorDetailPage() {
     tutor.birthDatePublic && tutor.birthDate ? `${tutor.birthDate.slice(0, 4)}년생` : null,
   ].filter((item): item is string => Boolean(item));
 
-  const [showAllReviews, setShowAllReviews] = useState(false);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [reviewText, setReviewText] = useState('');
-  const [activeSections, setActiveSections] = useState<Set<string>>(() => new Set(['edu', 'career']));
-
-  const allReviews = reviews.length > 0 ? reviews : INITIAL_REVIEWS;
+  const allReviews = reviews;
   const visibleReviews = showAllReviews ? allReviews : allReviews.slice(0, 3);
+  const ratingDistribution = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: allReviews.filter((review) => review.rating === star).length,
+  }));
+  const totalRatings = allReviews.length;
 
   const toggle = (key: string) => {
     setActiveSections((current) => {
@@ -409,17 +412,17 @@ export default function TutorDetailPage() {
           <div className="text-center shrink-0">
             <p className="text-4xl font-bold text-foreground">{tutor.rating}</p>
             <StarRow rating={tutor.rating} size={14} />
-            <p className="text-xs text-muted-foreground mt-1">{TOTAL_RATINGS}개 평가</p>
+            <p className="text-xs text-muted-foreground mt-1">{totalRatings}개 평가</p>
           </div>
           <div className="flex-1 space-y-1.5">
-            {RATING_DIST.map(({ star, count }) => (
+            {ratingDistribution.map(({ star, count }) => (
               <div key={star} className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground w-3">{star}</span>
                 <Star size={10} className="fill-amber-400 text-amber-400 shrink-0" />
                 <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
                   <div
                     className="h-full bg-amber-400 rounded-full"
-                    style={{ width: `${TOTAL_RATINGS ? (count / TOTAL_RATINGS) * 100 : 0}%` }}
+                    style={{ width: `${totalRatings ? (count / totalRatings) * 100 : 0}%` }}
                   />
                 </div>
                 <span className="text-xs text-muted-foreground w-4 text-right">{count}</span>
