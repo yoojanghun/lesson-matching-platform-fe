@@ -177,9 +177,9 @@ export default function TutorDetailPage() {
           </div>
 
           <div className="flex flex-wrap gap-1.5 mt-4">
-            {tutor.tags.map((tag) => (
+            {tutor.tags.map((tag, index) => (
               <span
-                key={tag}
+                key={`${tag}-${index}`}
                 className="px-2.5 py-1 bg-secondary text-secondary-foreground rounded-lg text-xs font-medium"
               >
                 {tag}

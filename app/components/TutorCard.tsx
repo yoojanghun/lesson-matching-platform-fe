@@ -48,8 +48,8 @@ export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: (
           </div>
           <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{tutor.title ?? tutor.intro}</p>
           <div className="flex flex-wrap gap-1 mt-3">
-            {tutor.tags.map((tag) => (
-              <span key={tag} className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded text-xs">
+            {tutor.tags.map((tag, index) => (
+              <span key={`${tag}-${index}`} className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded text-xs">
                 {tag}
               </span>
             ))}
