@@ -19,9 +19,15 @@ interface TutorCardResponse {
 
 interface TutorSearchPage {
   content: TutorCardResponse[];
-  totalPages: number;
-  totalElements: number;
-  number: number;
+  totalPages?: number;
+  totalElements?: number;
+  number?: number;
+  page?: {
+    size: number;
+    number: number;
+    totalElements: number;
+    totalPages: number;
+  };
 }
 
 export interface TutorSearchResult {
@@ -119,7 +125,7 @@ function toTutor(response: TutorCardResponse): Tutor {
     rating: response.averageRating ?? 0,
     reviews: response.reviewCount ?? 0,
     price: response.priceRange?.minPrice ?? 0,
-    tags: subjects ?? [],
+    tags: [...new Set(subjects ?? [])],
     intro: response.title ?? '',
     avatar: '/icons/categories/music.svg',
     available: true,
@@ -169,7 +175,7 @@ function toTutorFromProfile(response: TutorProfileResponse): Tutor {
     rating: 0,
     reviews: 0,
     price: prices[0] ?? 0,
-    tags: subjects ?? [],
+    tags: [...new Set(subjects ?? [])],
     intro: response.introduction ?? response.title ?? '',
     fullIntro: response.introduction ?? undefined,
     avatar: '/icons/categories/music.svg',
@@ -226,11 +232,16 @@ export function useTutorsQuery(filters?: {
           size: filters?.size ?? 8,
         },
       });
+      const data = response.data;
+      const totalPages = data.totalPages ?? data.page?.totalPages ?? 0;
+      const totalElements = data.totalElements ?? data.page?.totalElements ?? data.content.length;
+      const page = data.number ?? data.page?.number ?? 0;
+
       return {
-        content: response.data.content.map(toTutor),
-        totalPages: response.data.totalPages,
-        totalElements: response.data.totalElements,
-        page: response.data.number,
+        content: data.content.map(toTutor),
+        totalPages,
+        totalElements,
+        page,
       };
     },
     staleTime: 1000 * 60 * 5, // 5분간 신선 상태 유지

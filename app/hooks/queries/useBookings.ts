@@ -7,27 +7,91 @@ import type { LessonBooking } from '../../types';
 import { MY_LESSON_BOOKINGS } from '../../data/mockData';
 import { apiClient } from '../../lib/apiClient';
 
-// 수업 예약 목록 조회
-export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT') {
-  const storeBookings = useUserStore((state) => state.bookings);
+export interface BookingResult {
+  content: LessonBooking[];
+  totalPages: number;
+  totalElements: number;
+  page: number;
+}
 
+// 수업 예약 목록 조회
+export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT', page = 0, size = 10) {
   return useQuery({
-    queryKey: [...queryKeys.bookings.lists(), role],
-    queryFn: async (): Promise<LessonBooking[]> => {
+    queryKey: [...queryKeys.bookings.lists(), role, { page, size }],
+    queryFn: async (): Promise<BookingResult> => {
       if (role === 'TUTOR') {
-        const response = await apiClient.get<{ content: Array<{
+        const response = await apiClient.get<{
+          content: Array<{
+            reservationId: number;
+            studentName: string;
+            lessonDate: string;
+            startTime: string;
+            endTime: string;
+            reservationStatus: string;
+            createdAt: string;
+          }>;
+          totalPages?: number;
+          totalElements?: number;
+          number?: number;
+          page?: { size: number; number: number; totalElements: number; totalPages: number };
+        }>('/api/reservations/my', { params: { page, size } });
+
+        const data = response.data;
+        const totalPages = data.totalPages ?? data.page?.totalPages ?? (data.content?.length > 0 ? 1 : 0);
+        const totalElements = data.totalElements ?? data.page?.totalElements ?? data.content?.length ?? 0;
+        const pageNum = data.number ?? data.page?.number ?? page;
+
+        return {
+          content: data.content.map((reservation) => ({
+            id: reservation.reservationId,
+            tutor: reservation.studentName,
+            subject: '레슨',
+            avatar: '',
+            lessonDate: reservation.lessonDate,
+            lessonDay: new Date(`${reservation.lessonDate}T00:00:00`).toLocaleDateString('ko-KR', { weekday: 'short' }),
+            startTime: reservation.startTime,
+            endTime: reservation.endTime,
+            price: 0,
+            status: reservation.reservationStatus === 'CONFIRMED'
+              ? 'confirmed'
+              : reservation.reservationStatus === 'REJECTED'
+                ? 'rejected'
+                : 'pending',
+            requestedAt: reservation.createdAt,
+          })),
+          totalPages,
+          totalElements,
+          page: pageNum,
+        };
+      }
+
+      // STUDENT role
+      const response = await apiClient.get<{
+        content: Array<{
           reservationId: number;
-          studentName: string;
+          tutorId: number;
+          tutorName: string;
           lessonDate: string;
           startTime: string;
           endTime: string;
           reservationStatus: string;
           createdAt: string;
-        }> }>('/api/reservations/my', { params: { page: 0, size: 50 } });
+        }>;
+        totalPages?: number;
+        totalElements?: number;
+        number?: number;
+        page?: { size: number; number: number; totalElements: number; totalPages: number };
+      }>('/api/reservations/student/my', { params: { page, size } });
 
-        return response.data.content.map((reservation) => ({
+      const data = response.data;
+      const totalPages = data.totalPages ?? data.page?.totalPages ?? (data.content?.length > 0 ? 1 : 0);
+      const totalElements = data.totalElements ?? data.page?.totalElements ?? data.content?.length ?? 0;
+      const pageNum = data.number ?? data.page?.number ?? page;
+
+      return {
+        content: data.content.map((reservation) => ({
           id: reservation.reservationId,
-          tutor: reservation.studentName,
+          tutor: reservation.tutorName,
           subject: '레슨',
           avatar: '',
           lessonDate: reservation.lessonDate,
@@ -41,38 +105,11 @@ export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT') {
               ? 'rejected'
               : 'pending',
           requestedAt: reservation.createdAt,
-        }));
-      }
-
-      // STUDENT role
-      const response = await apiClient.get<{ content: Array<{
-        reservationId: number;
-        tutorId: number;
-        tutorName: string;
-        lessonDate: string;
-        startTime: string;
-        endTime: string;
-        reservationStatus: string;
-        createdAt: string;
-      }> }>('/api/reservations/student/my', { params: { page: 0, size: 50 } });
-
-      return response.data.content.map((reservation) => ({
-        id: reservation.reservationId,
-        tutor: reservation.tutorName,
-        subject: '레슨',
-        avatar: '',
-        lessonDate: reservation.lessonDate,
-        lessonDay: new Date(`${reservation.lessonDate}T00:00:00`).toLocaleDateString('ko-KR', { weekday: 'short' }),
-        startTime: reservation.startTime,
-        endTime: reservation.endTime,
-        price: 0,
-        status: reservation.reservationStatus === 'CONFIRMED'
-          ? 'confirmed'
-          : reservation.reservationStatus === 'REJECTED'
-            ? 'rejected'
-            : 'pending',
-        requestedAt: reservation.createdAt,
-      }));
+        })),
+        totalPages,
+        totalElements,
+        page: pageNum,
+      };
     },
     staleTime: 1000 * 30,
   });

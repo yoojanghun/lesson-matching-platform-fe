@@ -5,8 +5,24 @@ import { queryKeys } from '../../lib/queryKeys';
 import type { StudentMatching, TutorMatching } from '../../types';
 import { apiClient } from '../../lib/apiClient';
 
-interface MatchingPage<T> {
+export interface MatchingPage<T> {
   content: T[];
+  totalPages?: number;
+  totalElements?: number;
+  number?: number;
+  page?: {
+    size: number;
+    number: number;
+    totalElements: number;
+    totalPages: number;
+  };
+}
+
+export interface MatchingResult<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  page: number;
 }
 
 interface StudentMatchingResponse {
@@ -46,33 +62,64 @@ function normalizeStatus(status: string): 'pending' | 'accepted' | 'rejected' {
 }
 
 // 매칭 목록 조회
-export function useMatchingsQuery(role: 'STUDENT' | 'TUTOR', enabled = true) {
+export function useMatchingsQuery(
+  role: 'STUDENT' | 'TUTOR',
+  page = 0,
+  size = 10,
+  enabled = true,
+) {
   return useQuery({
-    queryKey: queryKeys.matchings.list(role),
-    queryFn: async (): Promise<(StudentMatching | TutorMatching)[]> => {
+    queryKey: [...queryKeys.matchings.list(role), { page, size }],
+    queryFn: async (): Promise<MatchingResult<StudentMatching | TutorMatching>> => {
       if (role === 'STUDENT') {
-        const response = await apiClient.get<MatchingPage<StudentMatchingResponse>>('/api/matchings/student/my');
-        return response.data.content.map((matching) => ({
+        const response = await apiClient.get<MatchingPage<StudentMatchingResponse>>(
+          '/api/matchings/student/my',
+          { params: { page, size } },
+        );
+        const data = response.data;
+        const totalPages = data.totalPages ?? data.page?.totalPages ?? (data.content?.length > 0 ? 1 : 0);
+        const totalElements = data.totalElements ?? data.page?.totalElements ?? data.content?.length ?? 0;
+        const pageNum = data.number ?? data.page?.number ?? page;
+
+        return {
+          content: data.content.map((matching) => ({
+            id: matching.matchingId,
+            tutor: matching.tutorName,
+            subject: matching.subject?.join(' · ') || '레슨',
+            date: formatDate(matching.createdAt),
+            time: formatTime(matching.createdAt),
+            status: normalizeStatus(matching.status),
+            message: matching.requestMsg,
+          })),
+          totalPages,
+          totalElements,
+          page: pageNum,
+        };
+      }
+
+      const response = await apiClient.get<MatchingPage<TutorMatchingResponse>>(
+        '/api/matchings/tutor/my',
+        { params: { page, size } },
+      );
+      const data = response.data;
+      const totalPages = data.totalPages ?? data.page?.totalPages ?? (data.content?.length > 0 ? 1 : 0);
+      const totalElements = data.totalElements ?? data.page?.totalElements ?? data.content?.length ?? 0;
+      const pageNum = data.number ?? data.page?.number ?? page;
+
+      return {
+        content: data.content.map((matching) => ({
           id: matching.matchingId,
-          tutor: matching.tutorName,
-          subject: matching.subject?.join(' · ') || '레슨',
+          student: matching.name,
+          subject: '레슨 매칭',
           date: formatDate(matching.createdAt),
           time: formatTime(matching.createdAt),
           status: normalizeStatus(matching.status),
           message: matching.requestMsg,
-        }));
-      }
-
-      const response = await apiClient.get<MatchingPage<TutorMatchingResponse>>('/api/matchings/tutor/my');
-      return response.data.content.map((matching) => ({
-        id: matching.matchingId,
-        student: matching.name,
-        subject: '레슨 매칭',
-        date: formatDate(matching.createdAt),
-        time: formatTime(matching.createdAt),
-        status: normalizeStatus(matching.status),
-        message: matching.requestMsg,
-      }));
+        })),
+        totalPages,
+        totalElements,
+        page: pageNum,
+      };
     },
     enabled,
     staleTime: 1000 * 30, // 30초

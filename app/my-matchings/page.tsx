@@ -30,6 +30,7 @@ import { useBookingsQuery } from "../hooks/queries/useBookings";
 import { useUpdateReservationStatusMutation } from "../hooks/queries/useBookings";
 import { usePaymentsQuery, usePayItemMutation, usePayAllMutation } from "../hooks/queries/usePayments";
 import LoginGate from "../components/LoginGate";
+import Pagination from "../components/Pagination";
 import BookingPage from "./BookingPage";
 import TutorStudentDetailPage from "./TutorStudentDetailPage";
 import type { CalEvent } from "../components/MiniCalendar";
@@ -100,23 +101,34 @@ const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
 export default function MyMatchingsPage() {
   const role = useUserStore((s) => s.role);
   const isTutor = role === "TUTOR";
+
+  const [requestsPage, setRequestsPage] = useState(0);
+  const [bookingsPage, setBookingsPage] = useState(0);
+  const [paymentsPage, setPaymentsPage] = useState(0);
+
   const { data: matchingsData } = useMatchingsQuery(
     role === "TUTOR" ? "TUTOR" : "STUDENT",
+    requestsPage,
+    10,
     role !== "GUEST",
   );
-  const { data: bookingsData } = useBookingsQuery(isTutor ? "TUTOR" : "STUDENT");
-  const { data: paymentsData } = usePaymentsQuery();
+  const { data: bookingsData } = useBookingsQuery(isTutor ? "TUTOR" : "STUDENT", bookingsPage, 10);
+  const { data: paymentsData } = usePaymentsQuery(paymentsPage, 10);
   const payItemMutation = usePayItemMutation();
   const payAllMutation = usePayAllMutation();
   const updateMatchingStatusMutation = useUpdateMatchingStatusMutation();
   const setMatchingPriceMutation = useSetMatchingPriceMutation();
   const updateReservationStatusMutation = useUpdateReservationStatusMutation();
 
-  const matchings: StudentMatching[] = (matchingsData as StudentMatching[]) ?? [];
-  const bookings = bookingsData ?? [];
-  const payments = paymentsData ?? [];
+  const matchings: StudentMatching[] = (matchingsData?.content as StudentMatching[]) ?? [];
+  const bookings = bookingsData?.content ?? [];
+  const payments = paymentsData?.content ?? [];
   const payItem = (id: number) => payItemMutation.mutate(id);
   const payAllUnpaid = () => payAllMutation.mutate();
+
+  const matchingsTotalPages = matchingsData?.totalPages ?? 1;
+  const bookingsTotalPages = bookingsData?.totalPages ?? 1;
+  const paymentsTotalPages = paymentsData?.totalPages ?? 1;
 
   const todayStr = (() => {
     const t = new Date();
@@ -134,7 +146,7 @@ export default function MyMatchingsPage() {
   >("received");
 
   // 튜터 매칭 목록 (레슨비 커스텀 지원)
-  const tutorMatchings = (matchingsData as TutorMatching[]) ?? [];
+  const tutorMatchings = (matchingsData?.content as TutorMatching[]) ?? [];
   const [selectedTutorMatchingId, setSelectedTutorMatchingId] = useState<
     number | null
   >(null);
@@ -347,82 +359,90 @@ export default function MyMatchingsPage() {
           보낸 요청 탭 (학생)
       ══════════════════════════════ */}
       {!isTutor && activeTab === "requests" && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-          <div className={`${COL} px-5 py-3 bg-muted/60 border-b border-border`}>
-            <span />
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">
-              요청 정보
-            </span>
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">
-              상태
-            </span>
-            <span className="w-4" />
-          </div>
-          {sentMatchings.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-10">
-              보낸 요청이 없습니다.
-            </p>
-          ) : (
-            sentMatchings.map((m, i) => {
-              const isAccepted = m.status === "accepted";
-              const tutor = TUTORS.find((t) => t.name === m.tutor);
-              return (
-                <div
-                  key={m.id}
-                  className={`${COL} px-5 py-4 transition-colors ${
-                    i !== sentMatchings.length - 1 ? "border-b border-border" : ""
-                  } ${
-                    isAccepted
-                      ? "cursor-pointer hover:bg-muted/40"
-                      : "hover:bg-muted/20"
-                  }`}
-                  onClick={
-                    isAccepted ? () => setBookingMatchingId(m.id) : undefined
-                  }
-                >
-                  {tutor?.avatar ? (
-                    <img
-                      src={tutor.avatar}
-                      alt={m.tutor}
-                      className="w-11 h-11 rounded-full object-cover shrink-0"
-                    />
-                  ) : (
-                    <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                      <GraduationCap size={18} className="text-primary" />
-                    </div>
-                  )}
-                  <div className="min-w-0 pt-0.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-bold text-foreground">{m.tutor}</p>
-                      <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">
-                        {m.subject}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {m.date} · {m.time}
-                    </p>
-                    <div
-                      className="mt-1.5 max-w-xs"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ExpandableMessage text={m.message} />
-                    </div>
-                  </div>
-                  <div className="flex items-center h-11">
-                    <StatusBadge status={m.status} />
-                  </div>
-                  <div className="flex items-center h-11">
-                    {isAccepted ? (
-                      <ChevronRight size={16} className="text-primary" />
+        <>
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+            <div className={`${COL} px-5 py-3 bg-muted/60 border-b border-border`}>
+              <span />
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">
+                요청 정보
+              </span>
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide self-center">
+                상태
+              </span>
+              <span className="w-4" />
+            </div>
+            {sentMatchings.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-10">
+                보낸 요청이 없습니다.
+              </p>
+            ) : (
+              sentMatchings.map((m, i) => {
+                const isAccepted = m.status === "accepted";
+                const tutor = TUTORS.find((t) => t.name === m.tutor);
+                return (
+                  <div
+                    key={m.id}
+                    className={`${COL} px-5 py-4 transition-colors ${
+                      i !== sentMatchings.length - 1 ? "border-b border-border" : ""
+                    } ${
+                      isAccepted
+                        ? "cursor-pointer hover:bg-muted/40"
+                        : "hover:bg-muted/20"
+                    }`}
+                    onClick={
+                      isAccepted ? () => setBookingMatchingId(m.id) : undefined
+                    }
+                  >
+                    {tutor?.avatar ? (
+                      <img
+                        src={tutor.avatar}
+                        alt={m.tutor}
+                        className="w-11 h-11 rounded-full object-cover shrink-0"
+                      />
                     ) : (
-                      <span className="w-4" />
+                      <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                        <GraduationCap size={18} className="text-primary" />
+                      </div>
                     )}
+                    <div className="min-w-0 pt-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-foreground">{m.tutor}</p>
+                        <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">
+                          {m.subject}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {m.date} · {m.time}
+                      </p>
+                      <div
+                        className="mt-1.5 max-w-xs"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExpandableMessage text={m.message} />
+                      </div>
+                    </div>
+                    <div className="flex items-center h-11">
+                      <StatusBadge status={m.status} />
+                    </div>
+                    <div className="flex items-center h-11">
+                      {isAccepted ? (
+                        <ChevronRight size={16} className="text-primary" />
+                      ) : (
+                        <span className="w-4" />
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+                );
+              })
+            )}
+          </div>
+
+          <Pagination
+            currentPage={requestsPage}
+            totalPages={matchingsTotalPages}
+            onPageChange={setRequestsPage}
+          />
+        </>
       )}
 
       {/* ══════════════════════════════
@@ -493,6 +513,11 @@ export default function MyMatchingsPage() {
               ))
             )}
           </div>
+          <Pagination
+            currentPage={bookingsPage}
+            totalPages={bookingsTotalPages}
+            onPageChange={setBookingsPage}
+          />
         </div>
       )}
 
@@ -594,6 +619,12 @@ export default function MyMatchingsPage() {
             ))}
           </div>
 
+          <Pagination
+            currentPage={paymentsPage}
+            totalPages={paymentsTotalPages}
+            onPageChange={setPaymentsPage}
+          />
+
           {/* 미결제 배너 */}
           {unpaidCount > 0 && (
             <div className="flex items-center justify-between gap-3 bg-accent/10 border border-accent/20 rounded-2xl px-5 py-4 shadow-sm">
@@ -687,6 +718,11 @@ export default function MyMatchingsPage() {
               );
             })}
           </div>
+          <Pagination
+            currentPage={requestsPage}
+            totalPages={matchingsTotalPages}
+            onPageChange={setRequestsPage}
+          />
         </div>
       )}
 
@@ -773,6 +809,12 @@ export default function MyMatchingsPage() {
               ))
             )}
           </div>
+
+          <Pagination
+            currentPage={bookingsPage}
+            totalPages={bookingsTotalPages}
+            onPageChange={setBookingsPage}
+          />
         </div>
       )}
 
