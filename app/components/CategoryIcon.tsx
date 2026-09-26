@@ -12,14 +12,41 @@ const CATEGORY_ICON_BY_CODE: Record<string, string> = {
 
 const CATEGORY_ICON_BY_ID: Record<number, string> = {};
 
+export const INSTRUMENT_EMOJI_BY_NAME: Record<string, string> = {
+  PIANO: '🎹',
+  피아노: '🎹',
+  VIOLIN: '🎻',
+  바이올린: '🎻',
+  CELLO: '🎻',
+  첼로: '🎻',
+  GUITAR: '🎸',
+  기타: '🎸',
+  DRUM: '🥁',
+  DRUMS: '🥁',
+  드럼: '🥁',
+  VOCAL: '🎤',
+  보컬: '🎤',
+  COMPOSITION: '🎼',
+  작곡: '🎼',
+};
+
+export function getInstrumentEmoji(value?: string) {
+  return value ? INSTRUMENT_EMOJI_BY_NAME[value.toUpperCase()] : undefined;
+}
+
 interface CategoryIconProps {
   code?: string;
   id?: number;
   className?: string;
   alt?: string;
+  emoji?: string;
 }
 
-export default function CategoryIcon({ code, id, className = 'h-7 w-7', alt = '' }: CategoryIconProps) {
+export default function CategoryIcon({ code, id, className = 'h-7 w-7', alt = '', emoji }: CategoryIconProps) {
+  if (emoji) {
+    return <span className={`${className} flex items-center justify-center text-[1.35rem] leading-none`} role={alt ? undefined : 'img'} aria-label={alt || undefined}>{emoji}</span>;
+  }
+
   const normalizedCode = code?.toUpperCase();
   const src = (normalizedCode && CATEGORY_ICON_BY_CODE[normalizedCode])
     ?? (id !== undefined ? CATEGORY_ICON_BY_ID[id] : undefined)

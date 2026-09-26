@@ -8,7 +8,7 @@ import { useCategoriesQuery } from '../hooks/queries/useCategories';
 import { useTrendingTutorsQuery, useRookieTutorsQuery } from '../hooks/queries/useTutors';
 import { useHydrated } from '../hooks/useHydrated';
 import TutorCard from './TutorCard';
-import CategoryIcon from './CategoryIcon';
+import CategoryIcon, { getInstrumentEmoji } from './CategoryIcon';
 
 export default function TutorSections() {
   const router = useRouter();
@@ -67,7 +67,7 @@ export default function TutorSections() {
                 className="flex flex-col items-center gap-2 p-3 sm:p-4 border border-border rounded-xl group cursor-pointer"
                 style={{ backgroundColor: '#ffffff' }}
               >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-secondary flex items-center justify-center"><CategoryIcon code={category.code ?? category.categoryName} id={category.categoryId} /></div>
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-secondary flex items-center justify-center"><CategoryIcon code={category.code ?? category.categoryName} id={category.categoryId} emoji={getInstrumentEmoji(category.code ?? category.categoryName)} /></div>
                 <span className="text-xs font-semibold text-foreground">{category.description}</span>
               </button>
             ))}
