@@ -3,29 +3,40 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
-import { CATEGORIES } from '../data/mockData';
-import { useCategoriesQuery } from '../hooks/queries/useCategories';
+import { useReferencesQuery } from '../hooks/queries/useReferences';
 import { useTrendingTutorsQuery, useRookieTutorsQuery } from '../hooks/queries/useTutors';
 import { useHydrated } from '../hooks/useHydrated';
 import TutorCard from './TutorCard';
 import CategoryIcon, { getInstrumentEmoji } from './CategoryIcon';
+
+const CATEGORY_LABELS: Record<string, string> = {
+  PIANO: '피아노',
+  VIOLIN: '바이올린',
+  CELLO: '첼로',
+  GUITAR: '기타',
+  DRUM: '드럼',
+  VOCAL: '보컬',
+  COMPOSITION: '작곡',
+};
 
 export default function TutorSections() {
   const router = useRouter();
   const [popularCategory, setPopularCategory] = useState('전체');
   const [latestCategory, setLatestCategory] = useState('전체');
   const hydrated = useHydrated();
-  const { data: categories, isLoading: isCategoriesLoading } = useCategoriesQuery();
+  const { data: references, isLoading: isReferencesLoading } = useReferencesQuery();
   const isLoggedIn = hydrated && !!localStorage.getItem('tm_token');
+  const categories = useMemo(() => references?.categories ?? [], [references?.categories]);
 
-  const popularCategoryId = useMemo(() => categories?.find(c => c.description === popularCategory)?.categoryId, [categories, popularCategory]);
-  const latestCategoryId = useMemo(() => categories?.find(c => c.description === latestCategory)?.categoryId, [categories, latestCategory]);
+  const getCategoryLabel = (categoryType: string) => CATEGORY_LABELS[categoryType] ?? categoryType;
+  const popularCategoryId = useMemo(() => categories.find(c => getCategoryLabel(c.categoryType) === popularCategory)?.categoryId, [categories, popularCategory]);
+  const latestCategoryId = useMemo(() => categories.find(c => getCategoryLabel(c.categoryType) === latestCategory)?.categoryId, [categories, latestCategory]);
 
   const { data: popularTutors, isLoading: isPopularLoading } = useTrendingTutorsQuery(popularCategoryId);
   const { data: latestTutors, isLoading: isLatestLoading } = useRookieTutorsQuery(latestCategoryId);
 
   const categoryOptions = useMemo(() => {
-    const options = categories?.map((category) => category.description) ?? CATEGORIES.map((category) => category.label);
+    const options = categories.map((category) => getCategoryLabel(category.categoryType));
     return ['전체', ...options];
   }, [categories]);
 
@@ -58,17 +69,17 @@ export default function TutorSections() {
           </button>
         </div>
         <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
-          {isCategoriesLoading
+          {isReferencesLoading
             ? Array.from({ length: 7 }).map((_, index) => <div key={index} className="h-24 bg-gray-100 animate-pulse rounded-xl" />)
-            : categories?.map((category) => (
+            : categories.map((category) => (
               <button
                 key={category.categoryId}
                 onClick={() => router.push(`/subjects?category=${category.categoryId}`)}
                 className="flex flex-col items-center gap-2 p-3 sm:p-4 border border-border rounded-xl group cursor-pointer"
                 style={{ backgroundColor: '#ffffff' }}
               >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-secondary flex items-center justify-center"><CategoryIcon code={category.code ?? category.categoryName} id={category.categoryId} emoji={getInstrumentEmoji(category.code ?? category.categoryName)} /></div>
-                <span className="text-xs font-semibold text-foreground">{category.description}</span>
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-secondary flex items-center justify-center"><CategoryIcon code={category.categoryType} id={category.categoryId} emoji={getInstrumentEmoji(category.categoryType)} /></div>
+                <span className="text-xs font-semibold text-foreground">{getCategoryLabel(category.categoryType)}</span>
               </button>
             ))}
         </div>

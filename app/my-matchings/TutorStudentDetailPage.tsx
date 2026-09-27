@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   ArrowLeft,
   User,
@@ -25,23 +25,40 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { TutorMatching, TutorStudentLesson } from "../types";
-import { TUTOR_STUDENT_LESSONS, TUTORS } from "../data/mockData";
 import MiniCalendar, { type CalEvent } from "../components/MiniCalendar";
 import { useUser } from "../components/UserContext";
+import { useMatchingDetailQuery } from "../hooks/queries/useMatchings";
+import { useCreateDirectReservationMutation, useReservationsByMatchingQuery } from "../hooks/queries/useBookings";
 
 const C_PRIMARY = "#1e3a5f";
 const C_ACCENT = "#e05a2b";
 const C_MUTED = "#6b748a";
 const C_GRID = "rgba(30,58,95,0.08)";
 
-function ChartTooltip({ active, payload, label, unit = "" }: any) {
+interface ChartTooltipPayload {
+  color?: string;
+  name?: string;
+  value?: unknown;
+}
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+  unit = "",
+}: {
+  active?: boolean;
+  payload?: ChartTooltipPayload[];
+  label?: string;
+  unit?: string;
+}) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-xs">
       <p className="font-bold text-foreground mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
+          {payload.map((p, i) => (
         <p key={i} style={{ color: p.color }} className="font-semibold">
-          {p.name}: {typeof p.value === "number" ? p.value.toLocaleString() : p.value}
+              {p.name}: {typeof p.value === "number" ? p.value.toLocaleString() : String(p.value ?? "")}
           {unit}
         </p>
       ))}
@@ -90,14 +107,23 @@ function addOneHour(time: string): string {
 
 export default function TutorStudentDetailPage({ matching, onBack, onUpdateFee }: Props) {
   const { showToast } = useUser();
-  const baseLessons = TUTOR_STUDENT_LESSONS[matching.student] ?? [];
-  const defaultFee = TUTORS[0].price;
-  const currentFee = matching.lessonFee ?? defaultFee;
+  const { data: matchingDetail } = useMatchingDetailQuery(matching.id);
+  const { data: reservations } = useReservationsByMatchingQuery(matching.id);
+  const createDirectReservationMutation = useCreateDirectReservationMutation();
+  const currentFee = matchingDetail?.pricePerLesson ?? matching.lessonFee ?? 0;
+  const studentName = matchingDetail?.studentName ?? matching.student;
 
   const now = new Date();
-  const [extraLessons, setExtraLessons] = useState<TutorStudentLesson[]>([]);
-  const lessons = [...baseLessons, ...extraLessons].sort(
-    (a, b) => a.lessonDate.localeCompare(b.lessonDate) || a.startTime.localeCompare(b.startTime)
+  const lessons: TutorStudentLesson[] = (reservations?.content ?? []).map((reservation) => ({
+    id: reservation.reservationId,
+    lessonDate: reservation.lessonDate,
+    lessonDay: getDayStr(reservation.lessonDate),
+    startTime: reservation.startTime,
+    endTime: reservation.endTime,
+    fee: currentFee,
+    paid: reservation.reservationStatus === "COMPLETED",
+  })).sort(
+    (a, b) => a.lessonDate.localeCompare(b.lessonDate) || a.startTime.localeCompare(b.startTime),
   );
 
   const [selDate, setSelDate] = useState<string | null>(todayStr());
@@ -110,14 +136,9 @@ export default function TutorStudentDetailPage({ matching, onBack, onUpdateFee }
   const [dayPopup, setDayPopup] = useState<{ date: string; mode: "view" | "add" } | null>(null);
   const [modalStart, setModalStart] = useState("10:00");
   const [modalEnd, setModalEnd] = useState("11:00");
-  const [modalFeeInput, setModalFeeInput] = useState(currentFee.toLocaleString());
   const [modalPaid, setModalPaid] = useState(false);
 
   const endSlots = TIME_SLOTS.filter((t) => t > modalStart);
-
-  useEffect(() => {
-    setModalEnd(addOneHour(modalStart));
-  }, [modalStart]);
 
   const openDayPopup = (date: string) => {
     setSelDate(date);
@@ -127,30 +148,29 @@ export default function TutorStudentDetailPage({ matching, onBack, onUpdateFee }
   const switchToAdd = () => {
     setModalStart("10:00");
     setModalEnd(addOneHour("10:00"));
-    setModalFeeInput(currentFee.toLocaleString());
     setModalPaid(false);
     setDayPopup((p) => (p ? { ...p, mode: "add" } : p));
   };
 
   const handleAddLesson = () => {
     if (!dayPopup) return;
-    const fee = parseInt(modalFeeInput.replace(/,/g, ""), 10);
-    if (!fee || fee <= 0 || modalEnd <= modalStart) return;
-    const newLesson: TutorStudentLesson = {
-      id: Date.now(),
-      lessonDate: dayPopup.date,
-      lessonDay: getDayStr(dayPopup.date),
+    if (modalEnd <= modalStart) return;
+    createDirectReservationMutation.mutate({
+      matchingId: matching.id,
+      date: dayPopup.date,
       startTime: modalStart,
       endTime: modalEnd,
-      fee,
-      paid: modalPaid,
-      paidAt: modalPaid
-        ? new Date().toISOString().slice(0, 16).replace("T", " ")
-        : undefined,
-    };
-    setExtraLessons((prev) => [...prev, newLesson]);
-    showToast(`${matching.student} 학생의 레슨이 성공적으로 등록되었습니다.`);
-    setDayPopup((p) => (p ? { ...p, mode: "view" } : p));
+      requestMsg: `${studentName} 학생 레슨`,
+      status: modalPaid ? "COMPLETED" : "CONFIRMED",
+    }, {
+      onSuccess: () => {
+        showToast(`${studentName} 학생의 레슨이 성공적으로 등록되었습니다.`);
+        setDayPopup((p) => (p ? { ...p, mode: "view" } : p));
+      },
+      onError: () => {
+        showToast("레슨 등록에 실패했습니다. 날짜와 예약 상태를 확인해 주세요.");
+      },
+    });
   };
 
   const calEvents: CalEvent[] = lessons.map((l) => ({
@@ -196,7 +216,7 @@ export default function TutorStudentDetailPage({ matching, onBack, onUpdateFee }
           <ArrowLeft size={18} />
         </button>
         <div>
-          <h2 className="text-xl font-bold text-foreground">{matching.student} 학생</h2>
+          <h2 className="text-xl font-bold text-foreground">{studentName} 학생</h2>
           <p className="text-xs text-muted-foreground mt-0.5">{matching.subject}</p>
         </div>
       </div>
@@ -478,7 +498,10 @@ export default function TutorStudentDetailPage({ matching, onBack, onUpdateFee }
                     </label>
                     <select
                       value={modalStart}
-                      onChange={(e) => setModalStart(e.target.value)}
+                      onChange={(e) => {
+                        setModalStart(e.target.value);
+                        setModalEnd(addOneHour(e.target.value));
+                      }}
                       className="w-full px-3 py-2.5 border border-border rounded-xl text-sm font-semibold text-foreground bg-card focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
                     >
                       {START_SLOTS.map((t) => (
@@ -506,21 +529,17 @@ export default function TutorStudentDetailPage({ matching, onBack, onUpdateFee }
                   </div>
                 </div>
 
-                {/* 레슨비 */}
+                {/* 매칭 레슨비 */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                    레슨비
+                    레슨비 (매칭 기준)
                   </label>
                   <div className="flex items-center gap-2 px-3 py-2.5 border border-border rounded-xl focus-within:ring-2 focus-within:ring-primary/30">
                     <input
                       type="text"
-                      inputMode="numeric"
-                      value={modalFeeInput}
-                      onChange={(e) => {
-                        const d = e.target.value.replace(/\D/g, "");
-                        setModalFeeInput(d ? Number(d).toLocaleString() : "");
-                      }}
-                      className="flex-1 bg-transparent text-sm font-bold text-foreground outline-none"
+                      value={currentFee ? currentFee.toLocaleString() : "확인 필요"}
+                      readOnly
+                      className="flex-1 cursor-default bg-transparent text-sm font-bold text-foreground outline-none"
                     />
                     <span className="text-sm text-muted-foreground shrink-0">원</span>
                   </div>

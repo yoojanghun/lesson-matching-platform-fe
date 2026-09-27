@@ -25,6 +25,20 @@ export interface MatchingResult<T> {
   page: number;
 }
 
+export interface MatchingDetailResponse {
+  matchingId: number;
+  requestMsg?: string | null;
+  status: string;
+  pricePerLesson?: number | null;
+  studentName: string;
+  studentGender?: string | null;
+  studentBirthDate?: string | null;
+  studentPhoneNumber?: string | null;
+  studentEmail?: string | null;
+  tutorName: string;
+  createdAt: string;
+}
+
 interface StudentMatchingResponse {
   matchingId: number;
   tutorId: number;
@@ -126,6 +140,15 @@ export function useMatchingsQuery(
   });
 }
 
+export function useMatchingDetailQuery(matchingId: number, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.matchings.detail(matchingId),
+    queryFn: () => apiClient.get<MatchingDetailResponse>(`/api/matchings/${matchingId}`).then((response) => response.data),
+    enabled: enabled && Boolean(matchingId),
+    staleTime: 1000 * 30,
+  });
+}
+
 // 매칭 신청 Mutation
 export function useCreateMatchingMutation() {
   const queryClient = useQueryClient();
@@ -153,9 +176,10 @@ export function useUpdateMatchingStatusMutation() {
         status: payload.status.toUpperCase(),
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, payload) => {
       // 승인/거절 성공 시 즉시 매칭 캐시 무효화하여 최신 데이터 재조회
       queryClient.invalidateQueries({ queryKey: queryKeys.matchings.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.matchings.detail(payload.id) });
     },
   });
 }
@@ -166,8 +190,9 @@ export function useSetMatchingPriceMutation() {
   return useMutation({
     mutationFn: (payload: { id: number; pricePerLesson: number }) =>
       apiClient.patch(`/api/matchings/${payload.id}/price`, payload),
-    onSuccess: () => {
+    onSuccess: (_, payload) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.matchings.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.matchings.detail(payload.id) });
     },
   });
 }

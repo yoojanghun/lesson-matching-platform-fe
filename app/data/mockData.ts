@@ -1,4 +1,3 @@
-import { Music, Guitar, Mic2, Piano, Drum, Waves, PenLine } from "lucide-react";
 import type { Tutor, Review, StudentMatching, TutorMatching, LessonBooking, PaymentItem, TutorLessonRequest, TutorStudentLesson } from "../types";
 
 export const TUTOR_LESSON_REQUESTS: TutorLessonRequest[] = [
@@ -41,16 +40,6 @@ export const TUTOR_LESSON_REQUESTS: TutorLessonRequest[] = [
     requestedAt: "2026-08-10 09:00",
     message: "이번 주 목요일 오전으로 부탁드립니다.",
   },
-];
-
-export const CATEGORIES = [
-  { icon: Piano, label: "피아노" },
-  { icon: Music, label: "바이올린" },
-  { icon: Waves, label: "첼로" },
-  { icon: Guitar, label: "기타" },
-  { icon: Drum, label: "드럼" },
-  { icon: Mic2, label: "보컬" },
-  { icon: PenLine, label: "작곡" },
 ];
 
 export const TUTORS: Tutor[] = [

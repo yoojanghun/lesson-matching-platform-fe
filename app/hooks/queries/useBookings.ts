@@ -2,9 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../lib/queryKeys';
-import { useUserStore } from '../../store/useUserStore';
 import type { LessonBooking } from '../../types';
-import { MY_LESSON_BOOKINGS } from '../../data/mockData';
 import { apiClient } from '../../lib/apiClient';
 
 export interface BookingResult {
@@ -12,6 +10,28 @@ export interface BookingResult {
   totalPages: number;
   totalElements: number;
   page: number;
+}
+
+export interface ReservationByMatchingResponse {
+  reservationId: number;
+  studentId: number;
+  studentName: string;
+  lessonDate: string;
+  startTime: string;
+  endTime: string;
+  reservationStatus: string;
+  createdAt: string;
+}
+
+export function useReservationsByMatchingQuery(matchingId: number, enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.bookings.all, 'matching', matchingId],
+    queryFn: () => apiClient.get<{ content: ReservationByMatchingResponse[] }>(`/api/reservations/matching/${matchingId}`, {
+      params: { page: 0, size: 100 },
+    }).then((response) => response.data),
+    enabled: enabled && Boolean(matchingId),
+    staleTime: 1000 * 30,
+  });
 }
 
 // 수업 예약 목록 조회
@@ -141,6 +161,25 @@ export function useCreateBookingMutation() {
       // 예약 및 결제 목록 캐시를 동시에 무효화 (예약 신청 시 결제 대기 건도 발생하므로)
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.lists() });
       queryClient.invalidateQueries({ queryKey: queryKeys.payments.lists() });
+    },
+  });
+}
+
+export function useCreateDirectReservationMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      matchingId: number;
+      date: string;
+      startTime: string;
+      endTime: string;
+      requestMsg?: string;
+      status: 'CONFIRMED' | 'COMPLETED';
+    }) => apiClient.post('/api/reservations/direct', payload),
+    onSuccess: (_, payload) => {
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.bookings.all, 'matching', payload.matchingId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.lists() });
     },
   });
 }

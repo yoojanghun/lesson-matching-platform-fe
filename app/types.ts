@@ -22,6 +22,9 @@ export interface ChatMessage {
 
 export interface Conversation {
   id: number;
+  roomId?: string;
+  matchingId?: number | null;
+  studentId?: number;
   tutorId: number;
   tutorName: string;
   tutorAvatar: string;
