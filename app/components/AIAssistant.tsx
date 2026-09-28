@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, Send, Sparkles, Star, ChevronRight, RotateCcw } from "lucide-react";
 import Image from "next/image";
-import { TUTORS } from "../data/mockData";
 import type { Tutor } from "../types";
 import { apiClient } from "../lib/apiClient";
 
@@ -65,7 +64,7 @@ function buildAiResponse(query: string): Omit<AiMessage, "id" | "role" | "time">
 
   for (const { keywords, subject, ids } of subjectKeywords) {
     if (keywords.some((k) => q.includes(k))) {
-      const matched = TUTORS.filter((t) => ids.includes(t.id));
+      const matched = ids;  // tutorId 목록만 유지 (mock 데이터 제거)
       const reasons: Record<number, string> = {
         1: "서울대 출신, 초급부터 입시까지 체계적인 커리큘럼 보유",
         2: "버클리음대 출신, 통기타·핑거스타일·팝 전문, 초보 환영",
@@ -88,7 +87,21 @@ function buildAiResponse(query: string): Omit<AiMessage, "id" | "role" | "time">
 
       return {
         text,
-        tutorCards: matched.map((t) => ({ tutor: t, reason: reasons[t.id] ?? t.intro })),
+        tutorCards: matched.map((id) => ({
+          tutor: {
+            id,
+            name: reasons[id] ? `ID: ${id}` : `튜터`,
+            subject,
+            rating: 0,
+            reviews: 0,
+            price: 0,
+            tags: [subject],
+            intro: reasons[id] ?? '맞춤형 레슨을 제공합니다.',
+            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&auto=format',
+            available: true,
+          } as Tutor,
+          reason: reasons[id] ?? subject,
+        })),
         quickReplies: ["레슨비가 궁금해요", "온라인 수업도 되나요?", "매칭 신청 방법 알려줘"],
       };
     }
@@ -207,7 +220,6 @@ function isTutorRecommendationQuery(query: string) {
 
 function toTutor(response: TutorRecommendationResponse): Tutor {
   const profile = response.profile;
-  const fallbackTutor = TUTORS.find((tutor) => tutor.id === response.tutorId);
   const subjects = profile?.subjects
     ?.map((subject) => subject.subjectType)
     .filter((subject): subject is string => Boolean(subject)) ?? [];
@@ -215,22 +227,22 @@ function toTutor(response: TutorRecommendationResponse): Tutor {
     ?.map((location) => location.name)
     .filter((location): location is string => Boolean(location)) ?? [];
   const price = profile?.prices?.[0]?.price;
-  const intro = profile?.introduction || profile?.title || fallbackTutor?.intro || "맞춤형 레슨을 제공합니다.";
+  const intro = profile?.introduction || profile?.title || "맞춤형 레슨을 제공합니다.";
 
   return {
     id: response.tutorId,
-    name: response.tutorName || profile?.name || fallbackTutor?.name || "튜터",
-    title: profile?.title || fallbackTutor?.title,
-    subject: subjects.join(" · ") || fallbackTutor?.subject || "음악 레슨",
-    rating: fallbackTutor?.rating ?? 0,
-    reviews: fallbackTutor?.reviews ?? 0,
-    price: price ?? fallbackTutor?.price ?? 0,
-    tags: subjects.length > 0 ? subjects : (fallbackTutor?.tags ?? []),
+    name: response.tutorName || profile?.name || "튜터",
+    title: profile?.title,
+    subject: subjects.join(" · ") || "음악 레슨",
+    rating: 0,
+    reviews: 0,
+    price: price ?? 0,
+    tags: subjects.length > 0 ? subjects : [],
     intro,
-    avatar: fallbackTutor?.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&auto=format",
-    available: fallbackTutor?.available ?? true,
-    lessonLocations: locations.length > 0 ? locations : fallbackTutor?.lessonLocations,
-    location: locations[0] || fallbackTutor?.location,
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&auto=format",
+    available: true,
+    lessonLocations: locations.length > 0 ? locations : undefined,
+    location: locations[0] || undefined,
   };
 }
 

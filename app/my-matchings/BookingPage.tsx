@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Star, MapPin, Video, Clock, CheckCircle2 } from "lucide-react";
-import { TUTORS } from "../data/mockData";
-import type { StudentMatching } from "../types";
 import { useCreateBookingMutation } from "../hooks/queries/useBookings";
+import { useTutorDetailQuery } from "../hooks/queries/useTutors";
 
 interface Props {
   matchingId: number;
@@ -66,7 +65,18 @@ function buildCalendar(year: number, month: number) {
 export default function BookingPage({ matchingId, matching, onBack, onConfirm }: Props) {
   const createBookingMutation = useCreateBookingMutation();
 
-  const tutor = TUTORS.find((t) => t.name === matching.tutor) ?? TUTORS[0];
+  const tutorId = matching.tutorId;
+  const { data: tutorData } = useTutorDetailQuery(tutorId ?? 0);
+
+  const tutorName = tutorData?.name ?? matching.tutor;
+  const tutorSubject = tutorData?.subjects?.map((s: { subjectType?: string }) => s.subjectType).join(' · ') ?? matching.subject;
+  const tutorPrice = tutorData?.prices?.[0]?.price ?? 0;
+  const tutorRating = tutorData?.rating ?? 0;
+  const tutorReviews = tutorData?.reviewCount ?? 0;
+  const tutorAvatar = tutorData?.profileImageUrl ?? '';
+  const tutorLocation = tutorData?.locations?.[0]?.name ?? '';
+  const tutorOnline = tutorData?.lessonType === 'ONLINE' || tutorData?.lessonType === 'BOTH';
+  const tutorIntro = tutorData?.introduction ?? '';
 
   const today = new Date();
   const [calYear, setCalYear] = useState(today.getFullYear());
@@ -153,7 +163,7 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
         </div>
         <h2 className="text-xl font-bold text-foreground">예약 신청 완료!</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          {tutor.name} 튜터에게 예약 신청이 전송되었습니다.<br />
+          {tutorName} 튜터에게 예약 신청이 전송되었습니다.<br />
           튜터 확정 후 알림을 드릴게요.
         </p>
         <p className="text-xs text-muted-foreground">잠시 후 이동합니다...</p>
@@ -178,19 +188,25 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
 
       {/* 튜터 간단 소개 */}
       <div className="bg-card border border-border rounded-2xl p-5 flex gap-4 shadow-sm">
-        <img
-          src={tutor.avatar}
-          alt={tutor.name}
-          className="w-16 h-16 rounded-xl object-cover bg-muted shrink-0"
-        />
+        {tutorAvatar ? (
+          <img
+            src={tutorAvatar}
+            alt={tutorName}
+            className="w-16 h-16 rounded-xl object-cover bg-muted shrink-0"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+            <span className="text-2xl font-bold text-primary">{tutorName?.[0] ?? '?'}</span>
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="font-bold text-foreground">{tutor.name} 튜터</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{tutor.subject}</p>
+              <p className="font-bold text-foreground">{tutorName} 튜터</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{tutorSubject}</p>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-sm font-bold text-primary">{tutor.price.toLocaleString()}원</p>
+              <p className="text-sm font-bold text-primary">{tutorPrice > 0 ? `${tutorPrice.toLocaleString()}원` : '가격 협의'}</p>
               <p className="text-xs text-muted-foreground">/시간</p>
             </div>
           </div>
@@ -200,36 +216,32 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
                 key={n}
                 size={12}
                 className={
-                  n <= Math.round(tutor.rating)
+                  n <= Math.round(tutorRating)
                     ? "fill-amber-400 text-amber-400"
                     : "fill-gray-200 text-gray-200"
                 }
               />
             ))}
-            <span className="text-xs font-semibold ml-0.5">{tutor.rating}</span>
-            <span className="text-xs text-muted-foreground">({tutor.reviews})</span>
+            <span className="text-xs font-semibold ml-0.5">{tutorRating > 0 ? tutorRating.toFixed(1) : '-'}</span>
+            <span className="text-xs text-muted-foreground">({tutorReviews})</span>
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 text-xs text-muted-foreground">
-            {tutor.location && (
+            {tutorLocation && (
               <span className="flex items-center gap-1">
                 <MapPin size={11} />
-                {tutor.location}
+                {tutorLocation}
               </span>
             )}
-            {tutor.onlineAvailable && (
+            {tutorOnline && (
               <span className="flex items-center gap-1">
                 <Video size={11} />
                 온라인 가능
               </span>
             )}
-            {tutor.responseTime && (
-              <span className="flex items-center gap-1">
-                <Clock size={11} />
-                응답 {tutor.responseTime}
-              </span>
-            )}
           </div>
-          <p className="text-xs text-foreground mt-2 line-clamp-2 leading-relaxed">{tutor.intro}</p>
+          {tutorIntro && (
+            <p className="text-xs text-foreground mt-2 line-clamp-2 leading-relaxed">{tutorIntro}</p>
+          )}
         </div>
       </div>
 
@@ -413,8 +425,8 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
           <h3 className="text-sm font-bold text-foreground">예약 정보 확인</h3>
           <div className="space-y-2 text-sm">
             {[
-              { label: "튜터", value: `${tutor.name} 튜터` },
-              { label: "악기 / 과목", value: tutor.subject },
+              { label: "튜터", value: `${tutorName} 튜터` },
+              { label: "악기 / 과목", value: tutorSubject },
               { label: "날짜", value: selectedDateLabel ?? "" },
               {
                 label: "시간",
@@ -422,7 +434,7 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
                   ? `${toKoreanTime(selectedTime)} ~ ${toKoreanTime(addHour(selectedTime))} (1시간)`
                   : "",
               },
-              { label: "레슨비", value: `${tutor.price.toLocaleString()}원` },
+              { label: "레슨비", value: tutorPrice > 0 ? `${tutorPrice.toLocaleString()}원` : '가격 협의' },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between">
                 <span className="text-muted-foreground">{label}</span>

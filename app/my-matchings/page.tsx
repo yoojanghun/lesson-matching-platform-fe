@@ -11,10 +11,7 @@ import {
   Calendar,
   Clock,
 } from "lucide-react";
-import {
-  TUTOR_LESSON_REQUESTS,
-  TUTORS,
-} from "../data/mockData";
+
 import dynamic from "next/dynamic";
 import type {
   PaymentItem,
@@ -157,21 +154,19 @@ export default function MyMatchingsPage() {
     useState<TutorMatching | null>(null);
 
   // 튜터 수업 예약 요청 목록
-  const lessonRequests: TutorLessonRequest[] = isTutor
-    ? bookings.map((booking) => ({
-        id: booking.id,
-        student: booking.tutor,
-        subject: booking.subject,
-        lessonDate: booking.lessonDate,
-        lessonDay: booking.lessonDay,
-        startTime: booking.startTime,
-        endTime: booking.endTime,
-        price: booking.price,
-        status: booking.status === "confirmed" ? "confirmed" : booking.status === "rejected" ? "rejected" : "pending",
-        requestedAt: booking.requestedAt,
-        message: "예약 요청",
-      }))
-    : TUTOR_LESSON_REQUESTS;
+  const lessonRequests: TutorLessonRequest[] = bookings.map((booking) => ({
+      id: booking.id,
+      student: booking.tutor,
+      subject: booking.subject,
+      lessonDate: booking.lessonDate,
+      lessonDay: booking.lessonDay,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      price: booking.price,
+      status: booking.status === "confirmed" ? "confirmed" : booking.status === "rejected" ? "rejected" : "pending",
+      requestedAt: booking.requestedAt,
+      message: "예약 요청",
+    }));
   const [lessonReqSelDate, setLessonReqSelDate] = useState<string | null>(
     todayStr
   );

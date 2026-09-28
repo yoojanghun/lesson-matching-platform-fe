@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { StudentMatching, Review, LessonBooking, PaymentItem, StudentProfile, TutorProfileData } from '../types';
-import { TUTORS, REVIEWS, MY_MATCHINGS_STUDENT, MY_LESSON_BOOKINGS, MY_PAYMENTS } from '../data/mockData';
 
 export type Role = 'GUEST' | 'STUDENT' | 'TUTOR';
 
@@ -94,10 +93,10 @@ export const useUserStore = create<UserState>()(
       userName: '',
       availableRoles: [],
       toast: null,
-      matchings: MY_MATCHINGS_STUDENT,
-      bookings: MY_LESSON_BOOKINGS,
-      payments: MY_PAYMENTS,
-      reviews: REVIEWS,
+      matchings: [],
+      bookings: [],
+      payments: [],
+      reviews: [],
       studentProfile: null,
       tutorProfile: null,
 
@@ -183,13 +182,10 @@ export const useUserStore = create<UserState>()(
       },
 
       addMatching: (tutorId: number, message: string, schedule: string) => {
-        const tutor = TUTORS.find((t) => t.id === tutorId);
-        if (!tutor) return;
-
         const newMatching: StudentMatching = {
           id: Date.now(),
-          tutor: tutor.name,
-          subject: tutor.subject,
+          tutor: `튜터 (ID: ${tutorId})`,
+          subject: '레슨',
           status: 'pending',
           message: message.trim() || '레슨 매칭을 신청합니다.',
           time: schedule.trim() || '협의 필요',

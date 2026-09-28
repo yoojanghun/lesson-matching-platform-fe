@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Send } from 'lucide-react';
-import { TUTORS } from '../../data/mockData';
 import { useUser } from '../../components/UserContext';
 import { useCreateMatchingMutation } from '../../hooks/queries/useMatchings';
 import { useTutorDetailQuery } from '../../hooks/queries/useTutors';
@@ -12,9 +11,7 @@ export default function MatchingRequestPage() {
   const router = useRouter();
   const params = useParams();
   const tutorId = Number(params.tutorId);
-  const { data: realTutor } = useTutorDetailQuery(tutorId);
-  const fallbackTutor = TUTORS.find((t) => t.id === tutorId) ?? TUTORS[0];
-  const tutor = realTutor ?? fallbackTutor;
+  const { data: tutor } = useTutorDetailQuery(tutorId);
   const { role } = useUser();
   const createMatchingMutation = useCreateMatchingMutation();
 
@@ -59,15 +56,22 @@ export default function MatchingRequestPage() {
 
       {/* Tutor summary */}
       <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3 shadow-sm">
-        <img
-          src={tutor.avatar}
-          alt={tutor.name}
-          className="w-11 h-11 rounded-full object-cover bg-muted shrink-0"
-        />
+        {tutor?.profileImageUrl ? (
+          <img
+            src={tutor.profileImageUrl}
+            alt={tutor.name}
+            className="w-11 h-11 rounded-full object-cover bg-muted shrink-0"
+          />
+        ) : (
+          <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center shrink-0">
+            <span className="text-lg font-bold text-primary">{tutor?.name?.[0] ?? '?'}</span>
+          </div>
+        )}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground">{tutor.name} 튜터</p>
+          <p className="text-sm font-semibold text-foreground">{tutor?.name ?? '튜터'} 튜터</p>
           <p className="text-xs text-muted-foreground">
-            {tutor.subject} · {tutor.price.toLocaleString()}원/시간
+            {tutor?.subjects?.map((s: { subjectType?: string }) => s.subjectType).join(' · ') ?? ''}
+            {tutor?.prices?.[0]?.price ? ` · ${tutor.prices[0].price.toLocaleString()}원/시간` : ''}
           </p>
         </div>
       </div>
