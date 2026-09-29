@@ -106,24 +106,18 @@ function TutorsContent() {
     page: currentPage,
   });
 
-  // 정렬 처리
+  // 서버 측 정렬 파라미터(tutorSortType)를 전달하므로 클라이언트 재정렬 불필요.
+  // mappedSortType이 없는 경우("인기순" 폴백)에만 클라이언트 정렬 적용.
   const tutors = tutorPage?.content ?? [];
   const sortedTutors = useMemo(() => {
+    if (mappedSortType) return tutors; // 서버가 이미 정렬된 결과를 반환
+    // 서버 정렬 파라미터 없는 경우 클라이언트 폴백
     const list = [...tutors];
     if (appliedSort === "인기순") {
       return list.sort((a, b) => b.rating - a.rating || b.reviews - a.reviews);
     }
-    if (appliedSort === "가격 낮은순") {
-      return list.sort((a, b) => a.price - b.price);
-    }
-    if (appliedSort === "가격 높은순") {
-      return list.sort((a, b) => b.price - a.price);
-    }
-    if (appliedSort === "최신순") {
-      return list.sort((a, b) => b.id - a.id);
-    }
     return list;
-  }, [tutors, appliedSort]);
+  }, [tutors, appliedSort, mappedSortType]);
 
   const totalPages = tutorPage?.totalPages ?? 0;
   const pageNumbers = Array.from({ length: totalPages }, (_, index) => index)
@@ -158,27 +152,27 @@ function TutorsContent() {
   const serviceLabel = selectedSubject
     ? `${selectedCategory} · ${selectedSubject}`
     : (selectedCategory === "전체" ? "전체" : `${selectedCategory} 전체`);
-  const normalizedServiceSearch = serviceSearch.trim().toLowerCase();
+  // normalizedServiceSearch와 normalizedFilterSearch는 동일한 값이므로 하나로 통합
+  const normalizedSearch = serviceSearch.trim().toLowerCase();
   const visibleCategories = categories.filter((category) =>
-    category.description.toLowerCase().includes(normalizedServiceSearch) ||
-    category.subjects.some((subject) => subject.description.toLowerCase().includes(normalizedServiceSearch)),
+    category.description.toLowerCase().includes(normalizedSearch) ||
+    category.subjects.some((subject) => subject.description.toLowerCase().includes(normalizedSearch)),
   );
-  const normalizedFilterSearch = serviceSearch.trim().toLowerCase();
   const visibleLocationGroups = locationGroups
     .map((group) => ({
       ...group,
-      children: group.children.filter((location) => location.name.toLowerCase().includes(normalizedFilterSearch)),
+      children: group.children.filter((location) => location.name.toLowerCase().includes(normalizedSearch)),
     }))
     .filter(({ parent, wholeLocation, children }) =>
-      !normalizedFilterSearch ||
-      parent.name.toLowerCase().includes(normalizedFilterSearch) ||
-      wholeLocation.name.toLowerCase().includes(normalizedFilterSearch) ||
+      !normalizedSearch ||
+      parent.name.toLowerCase().includes(normalizedSearch) ||
+      wholeLocation.name.toLowerCase().includes(normalizedSearch) ||
       children.length > 0,
     );
-  const visibleGoals = goalOptions.filter((goal) => goal.toLowerCase().includes(normalizedFilterSearch));
-  const visibleStyles = styleOptions.filter((style) => style.toLowerCase().includes(normalizedFilterSearch));
-  const visibleLessonTypes = lessonTypeOptions.filter((lessonType) => lessonType.toLowerCase().includes(normalizedFilterSearch));
-  const visibleSortTypes = sortOptions.filter((sortType) => sortType.toLowerCase().includes(normalizedFilterSearch));
+  const visibleGoals = goalOptions.filter((goal) => goal.toLowerCase().includes(normalizedSearch));
+  const visibleStyles = styleOptions.filter((style) => style.toLowerCase().includes(normalizedSearch));
+  const visibleLessonTypes = lessonTypeOptions.filter((lessonType) => lessonType.toLowerCase().includes(normalizedSearch));
+  const visibleSortTypes = sortOptions.filter((sortType) => sortType.toLowerCase().includes(normalizedSearch));
   const draftFilterCount =
     Number(selectedCategory !== "전체" || Boolean(selectedSubject)) +
     Number(selectedRegion !== "전체") +

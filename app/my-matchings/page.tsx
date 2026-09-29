@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   CheckCircle2,
   GraduationCap,
@@ -95,6 +95,7 @@ function ExpandableMessage({ text }: { text: string }) {
 }
 
 const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
+const WDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export default function MyMatchingsPage() {
   const role = useUserStore((s) => s.role);
@@ -128,13 +129,13 @@ export default function MyMatchingsPage() {
   const bookingsTotalPages = bookingsData?.totalPages ?? 1;
   const paymentsTotalPages = paymentsData?.totalPages ?? 1;
 
-  const todayStr = (() => {
+  const todayStr = useMemo(() => {
     const t = new Date();
     return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(
       2,
       "0"
     )}-${String(t.getDate()).padStart(2, "0")}`;
-  })();
+  }, []);
 
   const [activeTab, setActiveTab] = useState<
     "requests" | "bookings" | "payments"
@@ -155,7 +156,7 @@ export default function MyMatchingsPage() {
     useState<TutorMatching | null>(null);
 
   // 튜터 수업 예약 요청 목록
-  const lessonRequests: TutorLessonRequest[] = bookings.map((booking) => ({
+  const lessonRequests: TutorLessonRequest[] = useMemo(() => bookings.map((booking) => ({
       id: booking.id,
       student: booking.tutor,
       subject: booking.subject,
@@ -167,7 +168,7 @@ export default function MyMatchingsPage() {
       status: booking.status === "confirmed" ? "confirmed" : booking.status === "rejected" ? "rejected" : "pending",
       requestedAt: booking.requestedAt,
       message: "예약 요청",
-    }));
+    })), [bookings]);
   const [lessonReqSelDate, setLessonReqSelDate] = useState<string | null>(
     todayStr
   );
@@ -188,10 +189,9 @@ export default function MyMatchingsPage() {
 
   const sentMatchings = matchings;
   const lessonBookings = bookings;
-  const unpaidCount = payments.filter((p) => p.status === "unpaid").length;
-  const unpaidTotal = payments
-    .filter((p) => p.status === "unpaid")
-    .reduce((sum, p) => sum + p.price, 0);
+  const unpaidPayments = useMemo(() => payments.filter((p) => p.status === "unpaid"), [payments]);
+  const unpaidCount = unpaidPayments.length;
+  const unpaidTotal = unpaidPayments.reduce((sum, p) => sum + p.price, 0);
 
   const pendingReceivedCount = tutorMatchings.filter(
     (m) => m.status === "pending"
@@ -838,7 +838,6 @@ export default function MyMatchingsPage() {
 
       {/* 튜터 캘린더 날짜 클릭 팝업 */}
       {lessonReqPopup && (() => {
-        const WDAYS = ["일", "월", "화", "수", "목", "금", "토"];
         const [py, pm, pd] = lessonReqPopup.split("-").map(Number);
         const dow = WDAYS[new Date(lessonReqPopup).getDay()];
         const items = lessonRequests.filter((r) => r.lessonDate === lessonReqPopup);
@@ -923,7 +922,6 @@ export default function MyMatchingsPage() {
 
       {/* 레슨 예약 날짜 팝업 (학생) */}
       {bookingPopup && (() => {
-        const WDAYS = ["일", "월", "화", "수", "목", "금", "토"];
         const [py, pm, pd] = bookingPopup.split("-").map(Number);
         const dow = WDAYS[new Date(bookingPopup).getDay()];
         const items = lessonBookings.filter(
@@ -996,7 +994,6 @@ export default function MyMatchingsPage() {
 
       {/* 결제 날짜 팝업 (학생) */}
       {paymentPopup && (() => {
-        const WDAYS = ["일", "월", "화", "수", "목", "금", "토"];
         const [py, pm, pd] = paymentPopup.split("-").map(Number);
         const dow = WDAYS[new Date(paymentPopup).getDay()];
         const items = payments.filter((p) => p.lessonDate === paymentPopup);

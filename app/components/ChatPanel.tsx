@@ -42,6 +42,7 @@ export default function ChatPanel({ tutorName, tutorAvatar, tutorSubject, onClos
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const replyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const msgIdRef = useRef(10);
 
   useEffect(() => {
@@ -50,6 +51,9 @@ export default function ChatPanel({ tutorName, tutorAvatar, tutorSubject, onClos
 
   useEffect(() => {
     inputRef.current?.focus();
+    return () => {
+      if (replyTimerRef.current) clearTimeout(replyTimerRef.current);
+    };
   }, []);
 
   const send = () => {
@@ -62,10 +66,12 @@ export default function ChatPanel({ tutorName, tutorAvatar, tutorSubject, onClos
 
     // 튜터 자동 응답 시뮬레이션
     setIsTyping(true);
-    setTimeout(() => {
+    if (replyTimerRef.current) clearTimeout(replyTimerRef.current);
+    replyTimerRef.current = setTimeout(() => {
       const reply = AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
       setIsTyping(false);
       setMessages((prev) => [...prev, { id: msgIdRef.current++, from: "tutor", text: reply, time: nowTime() }]);
+      replyTimerRef.current = null;
     }, 1200 + Math.random() * 600);
   };
 

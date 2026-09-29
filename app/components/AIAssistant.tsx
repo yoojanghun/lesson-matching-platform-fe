@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { useRouter } from "next/navigation";
 import { X, Send, Sparkles, Star, ChevronRight, RotateCcw } from "lucide-react";
 import Image from "next/image";
@@ -264,7 +264,7 @@ async function fetchTutorRecommendations(query: string): Promise<Omit<AiMessage,
   };
 }
 
-function RenderText({ text }: { text: string }) {
+const RenderText = memo(function RenderText({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
     <div className="space-y-1">
@@ -305,7 +305,7 @@ function RenderText({ text }: { text: string }) {
       })}
     </div>
   );
-}
+});
 
 function TutorRecommendCard({
   tutor,
