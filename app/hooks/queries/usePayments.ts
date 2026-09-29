@@ -62,6 +62,43 @@ export function usePaymentsQuery(page = 0, size = 10) {
   });
 }
 
+// 결제 준비 (/api/payments/prepare) Mutation
+export function usePreparePaymentMutation() {
+  return useMutation({
+    mutationFn: async (payload: { matchingId: number; lessonCount: number }) => {
+      const response = await apiClient.post<{
+        orderId: string;
+        amount: number;
+        orderName: string;
+      }>('/api/payments/prepare', payload);
+      return response.data;
+    },
+  });
+}
+
+// 결제 승인 (/api/payments/confirm) Mutation
+export function useConfirmPaymentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: { paymentKey: string; orderId: string; amount: number }) => {
+      const response = await apiClient.post<{
+        paymentId: number;
+        orderId: string;
+        amount: number;
+        paymentMethod: string;
+        paymentStatus: string;
+        approvedAt: string;
+      }>('/api/payments/confirm', payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.payments.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.lists() });
+    },
+  });
+}
+
 // 개별 결제 진행 Mutation
 export function usePayItemMutation() {
   const queryClient = useQueryClient();
@@ -69,13 +106,10 @@ export function usePayItemMutation() {
 
   return useMutation({
     mutationFn: async (paymentId: number) => {
-      // API 연동 시: Toss 결제 승인 API 호출
-      // const res = await fetch('/api/v1/payments/toss/approve', { method: 'POST', body: JSON.stringify({ paymentId }) });
       payItemStore(paymentId);
       return { success: true, paymentId };
     },
     onSuccess: () => {
-      // 결제 성공 시 결제 내역 및 수업 목록 캐시 무효화
       queryClient.invalidateQueries({ queryKey: queryKeys.payments.lists() });
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.lists() });
     },

@@ -50,16 +50,16 @@ export default function MatchingRequestPage() {
       <div>
         <h2 className="text-xl font-bold text-foreground">레슨 매칭 요청</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          {tutor.name} 튜터에게 1:1 레슨을 요청합니다
+          {tutor?.name ?? '튜터'} 튜터에게 1:1 레슨을 요청합니다
         </p>
       </div>
 
       {/* Tutor summary */}
       <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3 shadow-sm">
-        {tutor?.profileImageUrl ? (
+        {tutor?.avatar ? (
           <img
-            src={tutor.profileImageUrl}
-            alt={tutor.name}
+            src={tutor.avatar}
+            alt={tutor.name ?? '튜터'}
             className="w-11 h-11 rounded-full object-cover bg-muted shrink-0"
           />
         ) : (
@@ -70,8 +70,8 @@ export default function MatchingRequestPage() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground">{tutor?.name ?? '튜터'} 튜터</p>
           <p className="text-xs text-muted-foreground">
-            {tutor?.subjects?.map((s: { subjectType?: string }) => s.subjectType).join(' · ') ?? ''}
-            {tutor?.prices?.[0]?.price ? ` · ${tutor.prices[0].price.toLocaleString()}원/시간` : ''}
+            {tutor?.subject ?? ''}
+            {tutor?.price ? ` · ${tutor.price.toLocaleString()}원/시간` : ''}
           </p>
         </div>
       </div>

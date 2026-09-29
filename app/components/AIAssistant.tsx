@@ -232,7 +232,7 @@ function toTutor(response: TutorRecommendationResponse): Tutor {
   return {
     id: response.tutorId,
     name: response.tutorName || profile?.name || "튜터",
-    title: profile?.title,
+    title: profile?.title ?? undefined,
     subject: subjects.join(" · ") || "음악 레슨",
     rating: 0,
     reviews: 0,

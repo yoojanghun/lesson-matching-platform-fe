@@ -244,10 +244,10 @@ export default function TutorProfilePage() {
       setBirthDatePublic(profile.birthDatePublic ?? false);
       setEmailPublic(profile.emailPublic ?? true);
       setPhoneNumberPublic(profile.phoneNumberPublic ?? true);
-      setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
-      setSubjects(profile.subjects.map((subject) => subject.subjectType ?? '').filter(Boolean));
-      setGoals(profile.goals.map((goal) => goal.description ?? '').filter(Boolean));
-      setTeachStyles(profile.styles.map((style) => style.description ?? '').filter(Boolean));
+      setLocation(profile.locations?.map((locationItem) => locationItem.name).join(', ') ?? '');
+      setSubjects(profile.subjects?.map((subject) => subject.subjectType ?? '').filter(Boolean) ?? []);
+      setGoals(profile.goals?.map((goal) => goal.description ?? '').filter(Boolean) ?? []);
+      setTeachStyles(profile.styles?.map((style) => style.description ?? '').filter(Boolean) ?? []);
       setTeachNote(profile.content ?? '');
       setTitle(profile.title ?? '');
       setIntro(profile.introduction ?? '');

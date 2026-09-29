@@ -34,6 +34,7 @@ import type { CalEvent } from "../components/MiniCalendar";
 
 // Code Splitting (Dynamic Imports for heavy components & modals)
 const PaymentModal = dynamic(() => import("../components/PaymentModal"), { ssr: false });
+const TossPaymentModal = dynamic(() => import("../components/TossPaymentModal"), { ssr: false });
 const LessonFeeModal = dynamic(() => import("../components/LessonFeeModal"), { ssr: false });
 const ApproveRejectModal = dynamic(() => import("../components/ApproveRejectModal"), { ssr: false });
 const TutorRevenuePanel = dynamic(() => import("../components/TutorRevenuePanel"), { ssr: false });
@@ -178,6 +179,7 @@ export default function MyMatchingsPage() {
     null
   );
   const [payingItem, setPayingItem] = useState<PaymentItem | null>(null);
+  const [tossPaymentTarget, setTossPaymentTarget] = useState<StudentMatching | null>(null);
 
   const [bookingSelDate, setBookingSelDate] = useState<string | null>(todayStr);
   const [bookingPopup, setBookingPopup] = useState<string | null>(null);
@@ -373,7 +375,6 @@ export default function MyMatchingsPage() {
             ) : (
               sentMatchings.map((m, i) => {
                 const isAccepted = m.status === "accepted";
-                const tutor = TUTORS.find((t) => t.name === m.tutor);
                 return (
                   <div
                     key={m.id}
@@ -388,17 +389,9 @@ export default function MyMatchingsPage() {
                       isAccepted ? () => setBookingMatchingId(m.id) : undefined
                     }
                   >
-                    {tutor?.avatar ? (
-                      <img
-                        src={tutor.avatar}
-                        alt={m.tutor}
-                        className="w-11 h-11 rounded-full object-cover shrink-0"
-                      />
-                    ) : (
-                      <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                        <GraduationCap size={18} className="text-primary" />
-                      </div>
-                    )}
+                    <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                      <GraduationCap size={18} className="text-primary" />
+                    </div>
                     <div className="min-w-0 pt-0.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-bold text-foreground">{m.tutor}</p>
@@ -419,9 +412,21 @@ export default function MyMatchingsPage() {
                     <div className="flex items-center h-11">
                       <StatusBadge status={m.status} />
                     </div>
-                    <div className="flex items-center h-11">
+                    <div className="flex items-center gap-2 h-11 justify-end">
                       {isAccepted ? (
-                        <ChevronRight size={16} className="text-primary" />
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTossPaymentTarget(m);
+                            }}
+                            className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                          >
+                            <CreditCard size={12} /> 결제
+                          </button>
+                          <ChevronRight size={16} className="text-primary" />
+                        </>
                       ) : (
                         <span className="w-4" />
                       )}
@@ -1087,7 +1092,17 @@ export default function MyMatchingsPage() {
         );
       })()}
 
-      {/* 결제 모달 */}
+      {/* Toss 결제 모달 */}
+      {tossPaymentTarget && (
+        <TossPaymentModal
+          matchingId={tossPaymentTarget.id}
+          tutorName={tossPaymentTarget.tutor}
+          subject={tossPaymentTarget.subject}
+          onClose={() => setTossPaymentTarget(null)}
+        />
+      )}
+
+      {/* 결제 모달 (내부/모의) */}
       {payingItem && (
         <PaymentModal
           item={payingItem}
@@ -1103,7 +1118,7 @@ export default function MyMatchingsPage() {
       {feeModalTarget && (
         <LessonFeeModal
           matching={feeModalTarget}
-          defaultFee={TUTORS[0].price}
+          defaultFee={feeModalTarget.lessonFee ?? 50000}
           onClose={() => setFeeModalTarget(null)}
           onSave={(id, fee) => {
             setMatchingPriceMutation.mutate({ id, pricePerLesson: fee });

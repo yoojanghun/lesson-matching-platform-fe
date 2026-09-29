@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Star, MapPin, Video, Clock, CheckCircle2 } from "lucide-react";
 import { useCreateBookingMutation } from "../hooks/queries/useBookings";
 import { useTutorDetailQuery } from "../hooks/queries/useTutors";
+import type { StudentMatching } from "../types";
 
 interface Props {
   matchingId: number;
@@ -69,14 +70,14 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
   const { data: tutorData } = useTutorDetailQuery(tutorId ?? 0);
 
   const tutorName = tutorData?.name ?? matching.tutor;
-  const tutorSubject = tutorData?.subjects?.map((s: { subjectType?: string }) => s.subjectType).join(' · ') ?? matching.subject;
-  const tutorPrice = tutorData?.prices?.[0]?.price ?? 0;
+  const tutorSubject = tutorData?.subject ?? matching.subject;
+  const tutorPrice = tutorData?.price ?? 0;
   const tutorRating = tutorData?.rating ?? 0;
-  const tutorReviews = tutorData?.reviewCount ?? 0;
-  const tutorAvatar = tutorData?.profileImageUrl ?? '';
-  const tutorLocation = tutorData?.locations?.[0]?.name ?? '';
-  const tutorOnline = tutorData?.lessonType === 'ONLINE' || tutorData?.lessonType === 'BOTH';
-  const tutorIntro = tutorData?.introduction ?? '';
+  const tutorReviews = tutorData?.reviews ?? 0;
+  const tutorAvatar = tutorData?.avatar ?? '';
+  const tutorLocation = tutorData?.location ?? '';
+  const tutorOnline = tutorData?.onlineAvailable ?? false;
+  const tutorIntro = tutorData?.intro ?? '';
 
   const today = new Date();
   const [calYear, setCalYear] = useState(today.getFullYear());

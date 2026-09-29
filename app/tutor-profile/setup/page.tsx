@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useEffect, useState } from 'react';
+import { Suspense, startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Check, ChevronDown } from 'lucide-react';
@@ -41,7 +41,7 @@ const STYLE_DESCRIPTIONS: Record<string, string> = {
   HUMOROUS_AND_FUN: '재미있고 유쾌한 분위기로 수업합니다',
 };
 
-export default function TutorProfileSetupPage() {
+function TutorProfileSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editType = searchParams.get('edit');
@@ -778,5 +778,19 @@ export default function TutorProfileSetupPage() {
         </section>
       )}
     </main>
+  );
+}
+
+export default function TutorProfileSetupPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">프로필 설정을 불러오는 중...</p>
+        </main>
+      }
+    >
+      <TutorProfileSetupContent />
+    </Suspense>
   );
 }
