@@ -1,6 +1,7 @@
 "use client";
 import type { Tutor } from "../types";
 import Image from "next/image";
+import { UserRound } from "lucide-react";
 import StarRow from "./StarRow";
 
 const DISPLAYABLE_LESSON_GOALS = [
@@ -13,6 +14,8 @@ export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: (
     .filter(({ values }) => tutor.lessonGoals?.some((goal) => values.includes(goal)))
     .map(({ label }) => label);
 
+  const hasCustomAvatar = tutor.avatar && !tutor.avatar.includes("music.svg");
+
   return (
     <div
       onClick={onClick}
@@ -20,13 +23,19 @@ export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: (
     >
       <div className="flex items-start gap-4">
         <div className="relative shrink-0">
-          <Image
-            src={tutor.avatar}
-            alt={tutor.name}
-            width={56}
-            height={56}
-            className="w-14 h-14 rounded-full object-cover bg-muted"
-          />
+          {hasCustomAvatar ? (
+            <Image
+              src={tutor.avatar}
+              alt={tutor.name}
+              width={56}
+              height={56}
+              className="w-14 h-14 rounded-full object-cover bg-muted"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center text-muted-foreground border border-border">
+              <UserRound size={26} strokeWidth={1.8} className="text-foreground/70" />
+            </div>
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">

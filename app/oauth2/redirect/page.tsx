@@ -30,6 +30,8 @@ export default function OAuth2RedirectPage() {
     const params = new URLSearchParams(window.location.search);
     const accessToken = params.get('accessToken');
     const isGuest = params.get('isGuest') === 'true';
+    const oauthName = params.get('name') ?? '';
+    const oauthEmail = params.get('email') ?? '';
 
     if (!accessToken) {
       setErrorMsg('Google 로그인에 실패했습니다. accessToken이 없습니다.');
@@ -57,7 +59,11 @@ export default function OAuth2RedirectPage() {
 
     // 3. GUEST(소셜 최초 가입)이면 회원가입 완료 페이지로, 아니면 홈으로
     if (isGuest) {
-      router.replace('/signup?oauth=true');
+      const search = new URLSearchParams();
+      search.set('oauth', 'true');
+      if (oauthName) search.set('name', oauthName);
+      if (oauthEmail) search.set('email', oauthEmail);
+      router.replace(`/signup?${search.toString()}`);
     } else {
       router.replace('/');
     }

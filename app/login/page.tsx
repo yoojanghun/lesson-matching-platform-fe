@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useUser, MOCK_ACCOUNTS, type TestAccount } from '../components/UserContext';
+import { useUser } from '../components/UserContext';
 import { useMutation } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 import type { Role } from '../store/useUserStore';
@@ -39,7 +39,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
-  const { setRole, setAvailableRoles, quickLogin } = useUser();
+  const { setRole, setAvailableRoles } = useUser();
 
   // 로그인 Mutation 정의
   const loginMutation = useMutation({
@@ -96,49 +96,11 @@ export default function LoginPage() {
     });
   };
 
-  const handleQuickLogin = (account: TestAccount) => {
-    quickLogin(account);
-    router.push('/');
-  };
-
   return (
     <div className="max-w-sm mx-auto space-y-6 py-4">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-foreground mb-1">로그인</h2>
         <p className="text-sm text-muted-foreground">계정에 접속하세요</p>
-      </div>
-
-      {/* 빠른 로그인 (테스트 계정) */}
-      <div className="bg-secondary/60 border border-border/80 rounded-2xl p-4 space-y-2.5">
-        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-          테스트 계정으로 빠른 로그인
-        </p>
-        <div className="flex gap-2">
-          {MOCK_ACCOUNTS.map((a) => (
-            <button
-              key={a.email}
-              type="button"
-              onClick={() => handleQuickLogin(a)}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 border-primary/20 bg-card text-primary hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer shadow-sm"
-            >
-              {a.role === 'STUDENT' ? '학생 계정' : '튜터 계정'}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-1 pt-1">
-          {MOCK_ACCOUNTS.map((a) => (
-            <div key={a.email} className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="font-medium">{a.role === 'STUDENT' ? '학생' : '튜터'}</span>
-              <span className="font-mono">{a.email} / {a.password}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-muted-foreground">또는 직접 입력</span>
-        <div className="flex-1 h-px bg-border" />
       </div>
 
       <form onSubmit={handleSubmitLogin} className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">

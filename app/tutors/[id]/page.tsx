@@ -8,6 +8,7 @@ import {
   Send,
   MessageSquare,
   User,
+  UserRound,
   Star,
   MapPin,
   Video,
@@ -140,13 +141,19 @@ export default function TutorDetailPage() {
           {/* Avatar + quick actions */}
           <div className="flex items-end justify-between -mt-10 mb-4">
             <div className="relative">
-              <Image
-                src={tutor.avatar}
-                alt={tutor.name}
-                width={80}
-                height={80}
-                className="w-20 h-20 rounded-2xl object-cover border-4 border-card bg-muted shadow-md"
-              />
+              {tutor.avatar && !tutor.avatar.includes('music.svg') ? (
+                <Image
+                  src={tutor.avatar}
+                  alt={tutor.name}
+                  width={80}
+                  height={80}
+                  className="w-20 h-20 rounded-2xl object-cover border-4 border-card bg-muted shadow-md"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl border-4 border-card bg-secondary flex items-center justify-center shadow-md">
+                  <UserRound size={36} strokeWidth={1.8} className="text-foreground/70" />
+                </div>
+              )}
               {tutor.available && (
                 <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 border-2 border-card rounded-full" />
               )}

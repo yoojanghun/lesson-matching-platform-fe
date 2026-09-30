@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, UserRound } from 'lucide-react';
 import { useUser } from '../../components/UserContext';
 import { useCreateMatchingMutation } from '../../hooks/queries/useMatchings';
 import { useTutorDetailQuery } from '../../hooks/queries/useTutors';
@@ -56,15 +56,15 @@ export default function MatchingRequestPage() {
 
       {/* Tutor summary */}
       <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3 shadow-sm">
-        {tutor?.avatar ? (
+        {tutor?.avatar && !tutor.avatar.includes('music.svg') ? (
           <img
             src={tutor.avatar}
             alt={tutor.name ?? '튜터'}
             className="w-11 h-11 rounded-full object-cover bg-muted shrink-0"
           />
         ) : (
-          <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center shrink-0">
-            <span className="text-lg font-bold text-primary">{tutor?.name?.[0] ?? '?'}</span>
+          <div className="w-11 h-11 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0">
+            <UserRound size={22} strokeWidth={1.8} className="text-foreground/70" />
           </div>
         )}
         <div className="flex-1 min-w-0">

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, BookOpen, GraduationCap } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
@@ -13,13 +13,28 @@ interface SignupData {
   userPassword: string;
 }
 
-export default function SignUpPage() {
+function SignUpFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isOAuth = searchParams.get('oauth') === 'true';
+
   const [step, setStep] = useState<'choose' | 'form'>('choose');
   const [selectedRole, setSelectedRole] = useState<'STUDENT' | 'TUTOR'>('STUDENT');
-  const [name, setName] = useState('');
-  const [userId, setUserId] = useState('');
-  const [password, setPassword] = useState('');
+  const [name, setName] = useState(searchParams.get('name') ?? '');
+  const [userId, setUserId] = useState(searchParams.get('email') ?? '');
+  const [password, setPassword] = useState(() =>
+    isOAuth ? `OAuth2!${Math.random().toString(36).slice(2)}${Date.now()}` : ''
+  );
+
+  useEffect(() => {
+    const qName = searchParams.get('name');
+    const qEmail = searchParams.get('email');
+    if (qName) setName(qName);
+    if (qEmail) setUserId(qEmail);
+    if (isOAuth && !password) {
+      setPassword(`OAuth2!${Math.random().toString(36).slice(2)}${Date.now()}`);
+    }
+  }, [searchParams, isOAuth, password]);
 
   // 학생 회원가입 Mutation 정의
   const signUpMutationAsStudent = useMutation({
@@ -151,18 +166,24 @@ export default function SignUpPage() {
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-foreground mb-1.5">비밀번호</label>
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors"
-            placeholder="8자 이상 입력"
-          />
-        </div>
+        {isOAuth ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-700">
+            Google 계정으로 인증되었습니다. 비밀번호를 설정하지 않고 바로 가입을 진행합니다.
+          </div>
+        ) : (
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1.5">비밀번호</label>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors"
+              placeholder="8자 이상 입력"
+            />
+          </div>
+        )}
 
         <button
           type="submit"
@@ -177,5 +198,13 @@ export default function SignUpPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-sm text-muted-foreground">로딩 중...</div>}>
+      <SignUpFormContent />
+    </Suspense>
   );
 }

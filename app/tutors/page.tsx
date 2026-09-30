@@ -195,7 +195,6 @@ function TutorsContent() {
 
   const appliedFilters = [
     ...(appliedSort ? [{ label: "정렬", value: appliedSort, type: "sort" as const }] : []),
-    ...(appliedSearchQuery ? [{ label: "검색어", value: appliedSearchQuery, type: "search" as const }] : []),
     ...(appliedSubject
       ? [{ label: "서비스", value: appliedSubject, type: "service" as const }]
       : appliedCategory !== "전체"
@@ -631,9 +630,9 @@ function TutorsContent() {
                               </button>
                               {category.subjects
                                 .filter((subject) =>
-                                  !normalizedServiceSearch ||
-                                  category.description.toLowerCase().includes(normalizedServiceSearch) ||
-                                  subject.description.toLowerCase().includes(normalizedServiceSearch),
+                                  !normalizedSearch ||
+                                  category.description.toLowerCase().includes(normalizedSearch) ||
+                                  subject.description.toLowerCase().includes(normalizedSearch),
                                 )
                                 .map((subject) => (
                                   <button
@@ -766,7 +765,7 @@ function TutorsContent() {
                       {selectedRegion === "전체" && <Check size={18} />}
                     </button>
                     {visibleLocationGroups.map(({ parent, wholeLocation, children }) => {
-                      const expanded = expandedRegions.includes(parent.locationId) || Boolean(normalizedFilterSearch);
+                      const expanded = expandedRegions.includes(parent.locationId) || Boolean(normalizedSearch);
                       const wholeRegion = wholeLocation.name === parent.name ? `${parent.name} 전체` : wholeLocation.name;
 
                       return (
