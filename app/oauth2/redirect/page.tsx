@@ -54,7 +54,7 @@ export default function OAuth2RedirectPage() {
       } else if (normalizedRoles.includes('STUDENT')) {
         role = 'STUDENT';
       }
-      setRole(role, payload.sub, payload.userId);
+      setRole(role, oauthName || payload.sub, payload.userId);
     }
 
     // 3. GUEST(소셜 최초 가입)이면 회원가입 완료 페이지로, 아니면 홈으로

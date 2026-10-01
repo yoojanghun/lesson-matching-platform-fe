@@ -205,6 +205,39 @@ function TutorProfileSetupContent() {
       return;
     }
 
+    if (searchParams.get('from') === 'oauth') {
+      setSubmitting(true);
+      try {
+        const res = await apiClient.post<{ accessToken: string }>('/api/sign-up/tutor-from-guest', {
+          categoryIds,
+          subjectIds,
+          title: title.trim(),
+          introduction: introduction.trim(),
+          lessonType,
+          educations,
+          experiences,
+          locationIds: lessonType === 'ONLINE' ? [] : selectedLocations,
+          styleIds: selectedStyles,
+          goalIds: selectedGoals,
+          lessonPriceDtos: lessonPrices.map(({ name, price }) => ({
+            className: name.trim(),
+            price: Number(price),
+          })),
+        });
+        if (res.data?.accessToken) {
+          localStorage.setItem('tm_token', res.data.accessToken);
+        }
+        alert('튜터 등록이 완료되었습니다!');
+        router.push('/tutor-profile');
+      } catch (error) {
+        const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
+        setErrorMessage(response?.data?.message ?? response?.data?.error ?? '튜터 등록 중 오류가 발생했습니다. 다시 시도해 주세요.');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (!pendingSignup) {
       setErrorMessage('기본 회원가입 정보가 없습니다. 회원가입을 처음부터 다시 진행해 주세요.');
       return;

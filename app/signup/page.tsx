@@ -36,7 +36,25 @@ function SignUpFormContent() {
     }
   }, [searchParams, isOAuth, password]);
 
-  // 학생 회원가입 Mutation 정의
+  // 학생 소셜 회원가입 Mutation 정의 (GUEST -> STUDENT)
+  const signUpGuestAsStudent = useMutation({
+    mutationFn: () => apiClient.post<{ accessToken: string }>('/api/sign-up/student-from-guest'),
+    onSuccess: (res) => {
+      if (res.data?.accessToken) {
+        localStorage.setItem('tm_token', res.data.accessToken);
+      }
+      alert('학생으로 가입이 완료되었습니다!');
+      router.push('/');
+    },
+    onError: (error) => {
+      console.error('소셜 학생 가입 실패:', error);
+      const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
+      const serverMessage = response?.data?.message ?? response?.data?.error;
+      alert(serverMessage ?? '가입 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+    },
+  });
+
+  // 일반 학생 회원가입 Mutation 정의
   const signUpMutationAsStudent = useMutation({
     mutationFn: (signUpData: SignupData) =>
       apiClient.post('/api/sign-up/student', signUpData),
@@ -52,7 +70,22 @@ function SignUpFormContent() {
     },
   });
 
-  // Form 제출 핸들러
+  // 역할 선택 핸들러
+  const handleSelectRole = (role: 'STUDENT' | 'TUTOR') => {
+    if (isOAuth) {
+      if (role === 'STUDENT') {
+        signUpGuestAsStudent.mutate();
+      } else {
+        router.push('/tutor-profile/setup?from=oauth');
+      }
+      return;
+    }
+
+    setSelectedRole(role);
+    setStep('form');
+  };
+
+  // Form 제출 핸들러 (일반 회원가입)
   const handleSubmitSignup = (e: React.SubmitEvent) => {
     e.preventDefault();
 
@@ -68,7 +101,7 @@ function SignUpFormContent() {
       sessionStorage.setItem('pending-tutor-signup', JSON.stringify(payload));
       router.push('/tutor-profile/setup');
     }
-  }
+  };
 
   if (step === 'choose') {
     return (
@@ -97,11 +130,9 @@ function SignUpFormContent() {
             <button
               key={role}
               type="button"
-              onClick={() => {
-                setSelectedRole(role);
-                setStep('form');
-              }}
-              className="flex flex-col items-center gap-3 p-6 bg-card border-2 border-border rounded-2xl hover:border-primary/50 transition-all hover:shadow-md cursor-pointer text-left group"
+              disabled={signUpGuestAsStudent.isPending}
+              onClick={() => handleSelectRole(role)}
+              className="flex flex-col items-center gap-3 p-6 bg-card border-2 border-border rounded-2xl hover:border-primary/50 transition-all hover:shadow-md cursor-pointer text-left group disabled:opacity-50"
             >
               <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Icon size={24} className={color} />
