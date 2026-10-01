@@ -8,8 +8,19 @@ export default function HeroSearchBar() {
   const router = useRouter();
   const [search, setSearch] = useState('');
 
+  const handleSearch = () => {
+    const trimmed = search.trim();
+    router.push(trimmed ? `/tutors?search=${encodeURIComponent(trimmed)}` : '/tutors');
+  };
+
   return (
-    <div className="flex gap-2">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSearch();
+      }}
+      className="flex gap-2"
+    >
       <div
         className="flex-1 flex items-center rounded-lg px-3 gap-2"
         style={{ backgroundColor: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)' }}
@@ -24,7 +35,7 @@ export default function HeroSearchBar() {
         />
       </div>
       <button
-        onClick={() => router.push(search.trim() ? `/tutors?search=${encodeURIComponent(search.trim())}` : '/tutors')}
+        type="submit"
         className="px-5 py-2.5 rounded-lg text-sm font-semibold shrink-0 transition-colors cursor-pointer"
         style={{ backgroundColor: '#e05a2b', color: '#ffffff' }}
         onMouseEnter={(event) => (event.currentTarget.style.backgroundColor = '#c44e22')}
@@ -32,6 +43,6 @@ export default function HeroSearchBar() {
       >
         검색
       </button>
-    </div>
+    </form>
   );
 }

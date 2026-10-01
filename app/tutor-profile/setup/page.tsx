@@ -9,6 +9,7 @@ import { useCategoriesQuery } from '../../hooks/queries/useCategories';
 import { useLocationsQuery, useReferencesQuery } from '../../hooks/queries/useReferences';
 import { useSaveTutorProfileMutation, useTutorProfileQuery } from '../../hooks/queries/useProfiles';
 import CategoryIcon from '../../components/CategoryIcon';
+import { useUser } from '../../components/UserContext';
 
 interface PendingTutorSignup {
   name: string;
@@ -43,6 +44,7 @@ const STYLE_DESCRIPTIONS: Record<string, string> = {
 
 function TutorProfileSetupContent() {
   const router = useRouter();
+  const { setRole, setAvailableRoles } = useUser();
   const searchParams = useSearchParams();
   const editType = searchParams.get('edit');
   const editSection = searchParams.get('section');
@@ -148,8 +150,9 @@ function TutorProfileSetupContent() {
   const finishSetup = async () => {
     setErrorMessage('');
 
+    const fromMode = searchParams.get('from');
     const pendingSignup = sessionStorage.getItem('pending-tutor-signup');
-    if (!profileEditMode && !pendingSignup) {
+    if (!profileEditMode && !fromMode && !pendingSignup) {
       setErrorMessage('기본 회원가입 정보가 없습니다. 회원가입을 처음부터 다시 진행해 주세요.');
       return;
     }
@@ -205,10 +208,11 @@ function TutorProfileSetupContent() {
       return;
     }
 
-    if (searchParams.get('from') === 'oauth') {
+    if (fromMode === 'oauth' || fromMode === 'switch') {
       setSubmitting(true);
+      const endpoint = fromMode === 'switch' ? '/api/sign-up/tutor-switch' : '/api/sign-up/tutor-from-guest';
       try {
-        const res = await apiClient.post<{ accessToken: string }>('/api/sign-up/tutor-from-guest', {
+        const res = await apiClient.post<{ accessToken: string }>(endpoint, {
           categoryIds,
           subjectIds,
           title: title.trim(),
@@ -227,6 +231,8 @@ function TutorProfileSetupContent() {
         if (res.data?.accessToken) {
           localStorage.setItem('tm_token', res.data.accessToken);
         }
+        setRole('TUTOR');
+        setAvailableRoles(fromMode === 'switch' ? ['STUDENT', 'TUTOR'] : ['TUTOR']);
         alert('튜터 등록이 완료되었습니다!');
         router.push('/tutor-profile');
       } catch (error) {
@@ -364,6 +370,12 @@ function TutorProfileSetupContent() {
         })}
         <span className={visibleStepStart + visibleSteps.length < stepLabels.length ? 'visible text-center tracking-[0.25em]' : 'invisible'} aria-hidden="true">...</span>
       </div>
+
+      {errorMessage && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
+          {errorMessage}
+        </div>
+      )}
 
       {step === 1 ? (
         <section>

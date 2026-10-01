@@ -24,6 +24,7 @@ function TutorsContent() {
   const searchParams = useSearchParams();
   const urlCategory = searchParams.get("category") || "전체";
   const urlSubject = searchParams.get("subject") || "";
+  const urlSearch = searchParams.get("search") || "";
   const [selectedCategoryOverride, setSelectedCategoryOverride] = useState<string | null>(null);
   const [selectedSubjectOverride, setSelectedSubjectOverride] = useState<string | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -39,8 +40,14 @@ function TutorsContent() {
   const [budgetMin, setBudgetMin] = useState(DEFAULT_MIN_BUDGET);
   const [budgetMax, setBudgetMax] = useState(DEFAULT_MAX_BUDGET);
   const [serviceSearch, setServiceSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState(urlSearch);
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState(urlSearch);
+
+  useEffect(() => {
+    const q = searchParams.get("search") || "";
+    setSearchInput(q);
+    setAppliedSearchQuery(q);
+  }, [searchParams]);
   const [currentPage, setCurrentPage] = useState(0);
   const [sort, setSort] = useState("인기순");
   const [appliedCategoryOverride, setAppliedCategoryOverride] = useState<string | null>(null);

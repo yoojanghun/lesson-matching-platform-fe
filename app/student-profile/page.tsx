@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { startTransition, useState, useEffect } from 'react';
 import {
   User,
   MapPin,
@@ -9,6 +9,8 @@ import {
   SlidersHorizontal,
   CheckCircle2,
   BookOpen,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 import { useUserStore } from '../store/useUserStore';
 import LoginGate from '../components/LoginGate';
@@ -44,17 +46,8 @@ type LessonType = typeof LESSON_TYPE_OPTIONS[number];
 const MIN_BUDGET = 0;
 const MAX_BUDGET = 200000;
 const BUDGET_STEP = 5000;
-const DEFAULT_MIN_BUDGET = 30000;
-const DEFAULT_MAX_BUDGET = 100000;
-
-const DAY_OPTIONS = ["월", "화", "수", "목", "금", "토", "일"];
-
-const TIME_OPTIONS = [
-  "오전 (7시~12시)",
-  "오후 (12시~17시)",
-  "저녁 (17시~21시)",
-  "밤 (21시 이후)",
-];
+const DEFAULT_MIN_BUDGET = 0;
+const DEFAULT_MAX_BUDGET = MAX_BUDGET;
 
 const GOAL_API_VALUES: Record<string, string> = {
   "취미 / 여가": "HOBBY",
@@ -131,7 +124,7 @@ function SectionCard({
 
 export default function StudentProfilePage() {
   const role = useUserStore((state) => state.role);
-  const { data: categories, isLoading: isCategoriesLoading } = useCategoriesQuery();
+  const { data: categories } = useCategoriesQuery();
   const { data: references } = useReferencesQuery(role !== 'GUEST');
   const savedProfile = useUserStore((state) => state.studentProfile);
   const saveStudentProfile = useUserStore((state) => state.saveStudentProfile);
@@ -140,14 +133,16 @@ export default function StudentProfilePage() {
 
   /* 상태 */
   const [interests, setInterests] = useState<string[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([]);
   const [goals, setGoals] = useState<string[]>([]);
   const [styles, setStyles] = useState<string[]>([]);
   const [lessonType, setLessonType] = useState<LessonType | "">("");
   const [location, setLocation] = useState("");
+  const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>([]);
   const [budgetMin, setBudgetMin] = useState(DEFAULT_MIN_BUDGET);
   const [budgetMax, setBudgetMax] = useState(DEFAULT_MAX_BUDGET);
-  const [days, setDays] = useState<string[]>([]);
-  const [times, setTimes] = useState<string[]>([]);
   const [memo, setMemo] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -221,49 +216,81 @@ export default function StudentProfilePage() {
   // 저장된 프로필이 있다면 불러오기
   useEffect(() => {
     if (savedProfile) {
-      setInterests(savedProfile.interests || []);
-      setGoals(savedProfile.goals || []);
-      setStyles(savedProfile.styles || []);
-      setLessonType(savedProfile.lessonType || "");
-      setLocation(savedProfile.location || "");
+      startTransition(() => {
+        const matchedCategoryIds = (categories ?? []).filter((category) => savedProfile.interests.includes(category.description)).map((category) => category.categoryId);
+        setSelectedCategoryIds(matchedCategoryIds);
+        setActiveCategoryId(matchedCategoryIds[0] ?? null);
+        setInterests(savedProfile.interests || []);
+        setSelectedSubjectIds(
+          (savedProfile.subjects || []).flatMap((subjectName) =>
+            (categories ?? []).flatMap((category) => category.subjects)
+              .filter((subject) => subject.description === subjectName || subject.subjectName === subjectName)
+              .map((subject) => subject.subjectId),
+          ),
+        );
+        setGoals(savedProfile.goals || []);
+        setStyles(savedProfile.styles || []);
+        setLessonType(savedProfile.lessonType || "");
+        setLocation(savedProfile.location || "");
 
-      const range = savedProfile.budgetMin !== undefined || savedProfile.budgetMax !== undefined
-        ? {
-            min: savedProfile.budgetMin ?? DEFAULT_MIN_BUDGET,
-            max: savedProfile.budgetMax ?? DEFAULT_MAX_BUDGET,
-          }
-        : budgetRangeFromLegacy(savedProfile.budget || []);
+        const range = savedProfile.budgetMin !== undefined || savedProfile.budgetMax !== undefined
+          ? {
+              min: savedProfile.budgetMin ?? DEFAULT_MIN_BUDGET,
+              max: savedProfile.budgetMax ?? DEFAULT_MAX_BUDGET,
+            }
+          : budgetRangeFromLegacy(savedProfile.budget || []);
 
-      setBudgetMin(range.min);
-      setBudgetMax(range.max);
-      setDays(savedProfile.days || []);
-      setTimes(savedProfile.times || []);
-      setMemo(savedProfile.memo || "");
+        setBudgetMin(range.min);
+        setBudgetMax(range.max);
+        setMemo(savedProfile.memo || "");
+      });
     }
-  }, [savedProfile]);
+  }, [categories, savedProfile]);
+
+  useEffect(() => {
+    if (!savedProfile || !references?.locations) return;
+    const savedLocationNames = savedProfile.location.split(',').map((item) => item.trim()).filter(Boolean);
+    startTransition(() => {
+      setSelectedLocationIds(references.locations.filter((item) => savedLocationNames.includes(item.name)).map((item) => item.locationId));
+    });
+  }, [references, savedProfile]);
 
   useEffect(() => {
     const profile = profileQuery.data;
     if (!profile) return;
 
-    setInterests(profile.instruments.map((instrument) =>
-      categories?.find((category) => category.categoryName === instrument.categoryType)?.description ?? instrument.categoryType ?? ''
-    ).filter(Boolean));
-    setGoals(profile.goals.map((goal) =>
-      references?.lessonGoals.find((referenceGoal) => referenceGoal.lessonGoalType === goal.lessonGoalType)?.description ??
-      GOAL_OPTIONS.find(({ label }) => GOAL_API_VALUES[label] === goal.lessonGoalType)?.label ?? ''
-    ).filter(Boolean));
-    setStyles(profile.styles.map((style) =>
-      references?.tutorStyles.find((referenceStyle) => referenceStyle.styleType === style.styleType)?.description ??
-      STYLE_OPTIONS.find((label) => STYLE_API_VALUES[label] === style.styleType) ?? ''
-    ).filter(Boolean));
-    setLessonType(Object.entries(LESSON_TYPE_API_VALUES).find(([, value]) => value === profile.lessonType)?.[0] as LessonType | undefined ?? '');
-    setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
-    const budgetTypes = profile.budgetTypes ?? (profile.budgetType ? [profile.budgetType] : []);
-    const range = budgetRangeFromLegacy(budgetTypes);
-    setBudgetMin(range.min);
-    setBudgetMax(range.max);
-    setMemo(profile.introduction ?? '');
+    const profileCategoryIds = profile.instruments
+      .map((instrument) => instrument.categoryId)
+      .filter((categoryId): categoryId is number => categoryId !== undefined);
+    const matchedCategoryIds = profileCategoryIds.length > 0
+      ? profileCategoryIds
+      : (categories ?? []).filter((category) => profile.instruments.some((instrument) =>
+        instrument.categoryType === category.categoryName || instrument.categoryType === category.code || instrument.categoryType === category.description,
+      )).map((category) => category.categoryId);
+    startTransition(() => {
+      setSelectedCategoryIds(matchedCategoryIds);
+      setActiveCategoryId(matchedCategoryIds[0] ?? null);
+      setSelectedSubjectIds((profile.subjects ?? []).map((subject) => subject.subjectId).filter((id): id is number => id !== undefined));
+      setInterests(profile.instruments.map((instrument) =>
+        categories?.find((category) => category.categoryId === instrument.categoryId || category.categoryName === instrument.categoryType)?.description ?? instrument.categoryType ?? ''
+      ).filter(Boolean));
+      setGoals(profile.goals.map((goal) =>
+        references?.lessonGoals.find((referenceGoal) => referenceGoal.lessonGoalType === goal.lessonGoalType)?.description ??
+        GOAL_OPTIONS.find(({ label }) => GOAL_API_VALUES[label] === goal.lessonGoalType)?.label ?? ''
+      ).filter(Boolean));
+      setStyles(profile.styles.map((style) =>
+        references?.tutorStyles.find((referenceStyle) => referenceStyle.styleType === style.styleType)?.description ??
+        STYLE_OPTIONS.find((label) => STYLE_API_VALUES[label] === style.styleType) ?? ''
+      ).filter(Boolean));
+      setLessonType(Object.entries(LESSON_TYPE_API_VALUES).find(([, value]) => value === profile.lessonType)?.[0] as LessonType | undefined ?? '');
+      setLocation(profile.locations.map((locationItem) => locationItem.name).join(', '));
+      setSelectedLocationIds(profile.locations.map((locationItem) => locationItem.locationId));
+      const budgetTypes = profile.budgetTypes ?? (profile.budgetType ? [profile.budgetType] : []);
+      const range = budgetRangeFromLegacy(budgetTypes);
+      setBudgetMin(range.min);
+      setBudgetMax(range.max);
+      setMemo(profile.introduction ?? '');
+    });
   }, [categories, profileQuery.data, references]);
 
   if (role === 'GUEST') {
@@ -278,11 +305,48 @@ export default function StudentProfilePage() {
   const toggle = (arr: string[], set: React.Dispatch<React.SetStateAction<string[]>>, val: string) =>
     set((prev) => (prev.includes(val) ? prev.filter((x) => x !== val) : [...prev, val]));
 
+  const selectedCategories = (categories ?? []).filter((category) => selectedCategoryIds.includes(category.categoryId));
+  const activeCategory = selectedCategories.find((category) => category.categoryId === activeCategoryId) ?? selectedCategories[0];
+  const locationGroups = (references?.locations ?? [])
+    .filter((item) => item.parentId === null)
+    .map((parent) => ({
+      parent,
+      wholeLocation: references?.locations.find((item) => item.parentId === parent.locationId && item.name === `${parent.name} 전체`) ?? parent,
+      children: (references?.locations ?? []).filter((item) => item.parentId === parent.locationId && item.name !== `${parent.name} 전체`),
+    }));
+
+  const toggleCategory = (categoryId: number) => {
+    const category = categories?.find((item) => item.categoryId === categoryId);
+    const isSelected = selectedCategoryIds.includes(categoryId);
+    setSelectedCategoryIds((current) => isSelected ? current.filter((id) => id !== categoryId) : [...current, categoryId]);
+    setInterests((current) => isSelected
+      ? current.filter((item) => item !== category?.description)
+      : category?.description ? [...current, category.description] : current);
+    if (isSelected && category) {
+      const subjectIds = new Set(category.subjects.map((subject) => subject.subjectId));
+      setSelectedSubjectIds((current) => current.filter((id) => !subjectIds.has(id)));
+    } else {
+      setActiveCategoryId(categoryId);
+    }
+  };
+
+  const toggleLocation = (locationId: number) => {
+    const selected = selectedLocationIds.includes(locationId);
+    setSelectedLocationIds((current) => selected ? current.filter((id) => id !== locationId) : [...current, locationId]);
+    const selectedLocation = references?.locations.find((item) => item.locationId === locationId);
+    if (!selectedLocation) return;
+    setLocation((current) => {
+      const names = current.split(',').map((item) => item.trim()).filter(Boolean);
+      return selected ? names.filter((name) => name !== selectedLocation.name).join(', ') : [...names, selectedLocation.name].join(', ');
+    });
+  };
+
   const handleSave = () => {
     const normalizedBudget = budgetFromRange(budgetMin, budgetMax);
 
     const profileData: StudentProfile = {
       interests,
+      subjects: selectedSubjectIds.flatMap((subjectId) => (categories ?? []).flatMap((category) => category.subjects).filter((subject) => subject.subjectId === subjectId).map((subject) => subject.description)),
       goals,
       styles,
       lessonType,
@@ -290,15 +354,14 @@ export default function StudentProfilePage() {
       budget: normalizedBudget,
       budgetMin,
       budgetMax,
-      days,
-      times,
       memo,
     };
     saveProfileMutation.mutate({
       categoryIds: categories?.filter((category) => interests.includes(category.description)).map((category) => category.categoryId),
       styleIds: references?.tutorStyles.filter((style) => styles.includes(style.description)).map((style) => style.id),
       goalIds: references?.lessonGoals.filter((goal) => goals.includes(goal.description ?? GOAL_OPTIONS.find((option) => GOAL_API_VALUES[option.label] === goal.lessonGoalType)?.label ?? '')).map((goal) => goal.goalId),
-      locationIds: references?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
+      locationIds: selectedLocationIds,
+      subjectIds: selectedSubjectIds,
       introduction: memo,
       lessonType: lessonType ? LESSON_TYPE_API_VALUES[lessonType] : undefined,
       minBudget: budgetMin,
@@ -324,17 +387,45 @@ export default function StudentProfilePage() {
 
       {/* 1. 관심 분야 */}
       <SectionCard icon={BookOpen} title="관심 분야">
-        <p className="text-xs text-muted-foreground -mt-1">배우고 싶은 악기나 분야를 모두 선택하세요.</p>
+        <p className="text-xs text-muted-foreground -mt-1">배우고 싶은 분야를 선택한 다음, 아래에서 세부 분야를 골라주세요. (복수 선택 가능)</p>
         <div className="flex flex-wrap gap-2">
-          {categories?.map(({ categoryId, description}) => (
+          {(categories ?? []).map((category) => (
             <Chip
-              key={categoryId}
-              label={description}
-              selected={interests.includes(description)}
-              onClick={() => toggle(interests, setInterests, description)}
+              key={category.categoryId}
+              label={category.description}
+              selected={selectedCategoryIds.includes(category.categoryId)}
+              onClick={() => toggleCategory(category.categoryId)}
             />
           ))}
         </div>
+        {selectedCategories.length > 0 && (
+          <div className="rounded-xl border border-border bg-muted/30 p-4">
+            <div className="mb-3 flex flex-wrap gap-2">
+              {selectedCategories.map((category) => (
+                <button
+                  key={category.categoryId}
+                  type="button"
+                  onClick={() => setActiveCategoryId(category.categoryId)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${activeCategory?.categoryId === category.categoryId ? 'border-accent bg-accent text-accent-foreground' : 'border-border bg-card text-muted-foreground hover:border-accent/50'}`}
+                >
+                  {category.description}
+                </button>
+              ))}
+            </div>
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">{activeCategory?.description} 세부 분야</p>
+            <div className="flex flex-wrap gap-2">
+              {(activeCategory?.subjects ?? []).map((subject) => (
+                <Chip
+                  key={subject.subjectId}
+                  label={subject.description}
+                  selected={selectedSubjectIds.includes(subject.subjectId)}
+                  onClick={() => setSelectedSubjectIds((current) => current.includes(subject.subjectId) ? current.filter((id) => id !== subject.subjectId) : [...current, subject.subjectId])}
+                />
+              ))}
+            </div>
+            {selectedSubjectIds.length === 0 && <p className="mt-3 text-xs text-muted-foreground">세부 분야를 하나 이상 선택해주세요.</p>}
+          </div>
+        )}
       </SectionCard>
 
       {/* 2. 레슨 목표 */}
@@ -400,7 +491,13 @@ export default function StudentProfilePage() {
             <button
               type="button"
               key={opt}
-              onClick={() => setLessonType(opt)}
+              onClick={() => {
+                setLessonType(opt);
+                if (opt === '온라인 수업') {
+                  setSelectedLocationIds([]);
+                  setLocation('');
+                }
+              }}
               className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all cursor-pointer ${
                 lessonType === opt
                   ? "bg-primary text-primary-foreground border-primary shadow-sm"
@@ -415,22 +512,36 @@ export default function StudentProfilePage() {
 
       {/* 5. 레슨 가능 지역 */}
       <SectionCard icon={MapPin} title="레슨 가능 지역">
-        <p className="text-xs text-muted-foreground -mt-1">대면 수업이 가능한 지역을 알려주세요.</p>
-        <div className="flex flex-wrap gap-2">
-          {(references?.locations ?? []).map((locationOption) => (
-            <Chip
-              key={locationOption.locationId}
-              label={locationOption.name}
-              selected={location.split(',').map((item) => item.trim()).includes(locationOption.name)}
-              onClick={() => setLocation((current) => {
-                const selected = current.split(',').map((item) => item.trim()).filter(Boolean);
-                return selected.includes(locationOption.name)
-                  ? selected.filter((item) => item !== locationOption.name).join(', ')
-                  : [...selected, locationOption.name].join(', ');
-              })}
-            />
-          ))}
+        <p className="text-xs text-muted-foreground -mt-1">대면 수업이 가능한 지역을 선택하세요. (복수 선택 가능)</p>
+        <div className={`overflow-hidden rounded-xl border border-border bg-card ${lessonType === '온라인 수업' ? 'opacity-60' : ''}`}>
+          {(locationGroups.length > 0 ? locationGroups : (references?.locations ?? []).map((locationItem) => ({ parent: locationItem, wholeLocation: locationItem, children: [] }))).map(({ parent, wholeLocation, children }) => {
+            const selected = selectedLocationIds.includes(wholeLocation.locationId);
+            const hasSelectedChild = children.some((item) => selectedLocationIds.includes(item.locationId));
+            return (
+              <div key={parent.locationId} className="border-b border-border last:border-b-0">
+                {children.length > 0 ? (
+                  <details>
+                    <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted">
+                      <span>{parent.name}</span><ChevronDown size={16} className="text-muted-foreground" />
+                    </summary>
+                    <div className="border-t border-border">
+                      <button type="button" disabled={lessonType === '온라인 수업' || hasSelectedChild} onClick={() => toggleLocation(wholeLocation.locationId)} className={`flex w-full items-center justify-between px-6 py-3 text-left text-sm ${selected ? 'bg-primary/5 font-semibold text-primary' : hasSelectedChild ? 'cursor-not-allowed text-muted-foreground/60' : 'hover:bg-muted'} disabled:cursor-not-allowed`}>
+                        <span>{wholeLocation.name === parent.name ? `${parent.name} 전체` : wholeLocation.name}</span><span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${selected ? 'border-primary bg-primary text-white' : 'border-border'}`}>{selected && <Check size={12} />}</span>
+                      </button>
+                      {children.map((item) => {
+                        const childSelected = selectedLocationIds.includes(item.locationId);
+                        return <button key={item.locationId} type="button" disabled={lessonType === '온라인 수업' || selected} onClick={() => toggleLocation(item.locationId)} className={`flex w-full items-center justify-between border-t border-border px-8 py-3 text-left text-sm ${childSelected ? 'bg-primary/5 font-semibold text-primary' : selected ? 'cursor-not-allowed text-muted-foreground/60' : 'hover:bg-muted'} disabled:cursor-not-allowed`}><span>{item.name}</span><span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${childSelected ? 'border-primary bg-primary text-white' : 'border-border'}`}>{childSelected && <Check size={12} />}</span></button>;
+                      })}
+                    </div>
+                  </details>
+                ) : (
+                  <button type="button" disabled={lessonType === '온라인 수업'} onClick={() => toggleLocation(wholeLocation.locationId)} className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm ${selected ? 'bg-primary/5 font-semibold text-primary' : 'hover:bg-muted'} disabled:cursor-not-allowed`}><span>{wholeLocation.name}</span><span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${selected ? 'border-primary bg-primary text-white' : 'border-border'}`}>{selected && <Check size={12} />}</span></button>
+                )}
+              </div>
+            );
+          })}
         </div>
+        {selectedLocationIds.length > 0 && <div className="flex flex-wrap gap-2"><p className="w-full text-xs font-semibold text-muted-foreground">선택한 지역</p>{selectedLocationIds.map((id) => { const item = references?.locations.find((locationItem) => locationItem.locationId === id); return item ? <Chip key={id} label={item.name} selected onClick={() => toggleLocation(id)} /> : null; })}</div>}
       </SectionCard>
 
       {/* 7. 예산 */}

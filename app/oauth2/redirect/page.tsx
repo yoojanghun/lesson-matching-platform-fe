@@ -22,7 +22,7 @@ function decodeJwtPayload(token: string): { sub: string; roles: string[]; userId
 
 export default function OAuth2RedirectPage() {
   const router = useRouter();
-  const { setRole } = useUser();
+  const { setRole, setAvailableRoles } = useUser();
   const [status, setStatus] = useState<'loading' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -47,7 +47,7 @@ export default function OAuth2RedirectPage() {
     if (payload) {
       const normalizedRoles = payload.roles.map((r: string) =>
         String(r).replace(/^ROLE_/, '').toUpperCase()
-      );
+      ) as Role[];
       let role: Role = 'GUEST';
       if (normalizedRoles.includes('TUTOR')) {
         role = 'TUTOR';
@@ -55,6 +55,7 @@ export default function OAuth2RedirectPage() {
         role = 'STUDENT';
       }
       setRole(role, oauthName || payload.sub, payload.userId);
+      setAvailableRoles(normalizedRoles.filter((r) => r !== 'GUEST'));
     }
 
     // 3. GUEST(소셜 최초 가입)이면 회원가입 완료 페이지로, 아니면 홈으로

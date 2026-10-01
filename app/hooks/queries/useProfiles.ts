@@ -35,6 +35,7 @@ export interface StudentProfileResponse {
   phoneNumber: string;
   styles: ProfileTypeDto[];
   instruments: ProfileCategoryDto[];
+  subjects?: ProfileSubjectDto[];
   goals: ProfileTypeDto[];
   locations: ProfileLocationDto[];
   introduction: string | null;
@@ -71,6 +72,7 @@ export interface StudentProfilePatchRequest {
   phoneNumber?: string;
   styleIds?: number[];
   categoryIds?: number[];
+  subjectIds?: number[];
   goalIds?: number[];
   locationIds?: number[];
   introduction?: string;

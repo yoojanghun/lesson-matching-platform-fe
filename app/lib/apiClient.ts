@@ -20,6 +20,9 @@ function isPublicApiRequest(url?: string) {
   // matchings 관련 요청은 무조건 인증 필요 (Private)
   if (url.startsWith('/api/matchings')) return false;
 
+  // GUEST 전환 및 역할 스위칭 가입 API는 토큰(인증) 필수
+  if (url.includes('-from-guest') || url.includes('-switch')) return false;
+
   const isExact = PUBLIC_EXACT_PATHS.includes(url);
   const isPrefix = PUBLIC_PREFIX_PATHS.some((path) => url.startsWith(path));
   const isTutorDetail = url.startsWith('/api/tutors/') && !url.startsWith('/api/matchings');

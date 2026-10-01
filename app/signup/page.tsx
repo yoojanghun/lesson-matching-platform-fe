@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, BookOpen, GraduationCap } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
+import { useUser } from '../components/UserContext';
 
 interface SignupData {
   name: string;
@@ -15,6 +16,7 @@ interface SignupData {
 
 function SignUpFormContent() {
   const router = useRouter();
+  const { setRole, setAvailableRoles } = useUser();
   const searchParams = useSearchParams();
   const isOAuth = searchParams.get('oauth') === 'true';
 
@@ -43,6 +45,8 @@ function SignUpFormContent() {
       if (res.data?.accessToken) {
         localStorage.setItem('tm_token', res.data.accessToken);
       }
+      setRole('STUDENT');
+      setAvailableRoles(['STUDENT']);
       alert('학생으로 가입이 완료되었습니다!');
       router.push('/');
     },

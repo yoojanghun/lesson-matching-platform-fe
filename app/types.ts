@@ -176,6 +176,7 @@ export interface FeeEntry {
 
 export interface StudentProfile {
   interests: string[];
+  subjects?: string[];
   goals: string[];
   styles: string[];
   lessonType: "대면 수업" | "온라인 수업" | "둘 다 가능" | "";
@@ -183,8 +184,8 @@ export interface StudentProfile {
   budget: string[];
   budgetMin?: number;
   budgetMax?: number;
-  days: string[];
-  times: string[];
+  days?: string[];
+  times?: string[];
   memo: string;
   updatedAt?: string;
 }

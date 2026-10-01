@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, X, ArrowLeftRight, UserRound } from "lucide-react";
 import { useUserStore } from "../store/useUserStore";
 import { useHydrated } from "../hooks/useHydrated";
@@ -21,6 +21,7 @@ const NAV_ITEMS_TUTOR = [
 ];
 
 export default function Navbar() {
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -37,7 +38,32 @@ export default function Navbar() {
   const currentRole = hydrated ? role : "GUEST";
   const navItems = currentRole === "TUTOR" ? NAV_ITEMS_TUTOR : NAV_ITEMS_STUDENT;
   const otherRole = currentRole === "STUDENT" ? "TUTOR" : "STUDENT";
-  const canSwitch = hydrated && availableRoles.length >= 2;
+  const hasOtherRole = hydrated && availableRoles.includes(otherRole as "STUDENT" | "TUTOR");
+
+  const handleRoleSwitch = async () => {
+    // 1. 현재 학생인데 튜터 등록 이력이 없는 경우 -> 10단계 튜터 프로필 설정 페이지로 이동
+    if (currentRole === "STUDENT" && !hasOtherRole) {
+      setProfileMenuOpen(false);
+      setMobileMenuOpen(false);
+      router.push("/tutor-profile/setup?from=switch");
+      return;
+    }
+
+    // 2. 이미 해당 역할을 보유하고 있는 경우 -> 즉시 서버 역할 전환
+    setSwitching(true);
+    try {
+      await switchRoleOnServer(otherRole as "STUDENT" | "TUTOR");
+      setProfileMenuOpen(false);
+      setMobileMenuOpen(false);
+      if (pathname === "/tutor-profile" || pathname === "/student-profile") {
+        router.replace("/profile");
+      }
+    } catch (error) {
+      console.error("역할 전환 실패:", error);
+    } finally {
+      setSwitching(false);
+    }
+  };
 
   useEffect(() => {
     if (!profileMenuOpen) return;
@@ -85,9 +111,12 @@ export default function Navbar() {
                 aria-label="사용자 메뉴 열기"
                 aria-expanded={profileMenuOpen}
                 onClick={() => setProfileMenuOpen((open) => !open)}
-                className="p-1.5 rounded-full text-foreground hover:bg-muted transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-full text-foreground hover:bg-muted transition-colors cursor-pointer"
               >
-                <UserRound size={22} strokeWidth={1.8} />
+                <span className="text-sm font-medium text-foreground">
+                  {userName || (currentRole === "STUDENT" ? "학생" : "튜터")}
+                </span>
+                <UserRound size={20} strokeWidth={1.8} className="text-muted-foreground" />
               </button>
               {profileMenuOpen && (
                 <div className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
@@ -99,27 +128,21 @@ export default function Navbar() {
                       {currentRole === "STUDENT" ? "학생" : "튜터"}
                     </p>
                   </div>
-                  {canSwitch && (
-                    <button
-                      type="button"
-                      disabled={switching}
-                      onClick={async () => {
-                        setSwitching(true);
-                        try {
-                          await switchRoleOnServer(otherRole as "STUDENT" | "TUTOR");
-                          setProfileMenuOpen(false);
-                        } catch (error) {
-                          console.error(error);
-                        } finally {
-                          setSwitching(false);
-                        }
-                      }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <ArrowLeftRight size={16} />
-                      {switching ? "전환 중..." : `${otherRole === "STUDENT" ? "학생" : "튜터"}로 전환`}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={switching}
+                    onClick={handleRoleSwitch}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <ArrowLeftRight size={16} />
+                    {switching
+                      ? "전환 중..."
+                      : otherRole === "STUDENT"
+                        ? "학생으로 전환"
+                        : hasOtherRole
+                          ? "튜터로 전환"
+                          : "튜터로 등록하기"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -176,21 +199,20 @@ export default function Navbar() {
           <div className="pt-2 flex gap-2">
             {currentRole !== "GUEST" ? (
             <>
-              {canSwitch && (
-                <button
-                  disabled={switching}
-                  onClick={async () => {
-                    setSwitching(true);
-                    try { await switchRoleOnServer(otherRole as 'STUDENT' | 'TUTOR'); }
-                    catch (e) { console.error(e); }
-                    finally { setSwitching(false); setMobileMenuOpen(false); }
-                  }}
-                  className="flex-1 py-2 border border-accent/40 rounded-lg text-sm text-accent font-semibold text-center cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-                >
-                  <ArrowLeftRight size={13} />
-                  {switching ? '전환 중...' : (otherRole === 'STUDENT' ? '학생 모드로' : '튜터 모드로')}
-                </button>
-              )}
+              <button
+                disabled={switching}
+                onClick={handleRoleSwitch}
+                className="flex-1 py-2 border border-accent/40 rounded-lg text-sm text-accent font-semibold text-center cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <ArrowLeftRight size={13} />
+                {switching
+                  ? '전환 중...'
+                  : otherRole === 'STUDENT'
+                    ? '학생으로 전환'
+                    : hasOtherRole
+                      ? '튜터로 전환'
+                      : '튜터로 등록하기'}
+              </button>
               <button
                 onClick={() => { logout(); setMobileMenuOpen(false); }}
                 className="flex-1 py-2 border border-border rounded-lg text-sm text-foreground text-center cursor-pointer"
