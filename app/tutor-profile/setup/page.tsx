@@ -7,7 +7,7 @@ import { ArrowLeft, Check, ChevronDown } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useCategoriesQuery } from '../../hooks/queries/useCategories';
 import { useLocationsQuery, useReferencesQuery } from '../../hooks/queries/useReferences';
-import { useSaveTutorProfileMutation, useTutorProfileQuery } from '../../hooks/queries/useProfiles';
+import { useTutorProfileQuery } from '../../hooks/queries/useProfiles';
 import CategoryIcon from '../../components/CategoryIcon';
 import { useUser } from '../../components/UserContext';
 
@@ -21,6 +21,21 @@ interface LessonPriceDraft {
   id: number;
   name: string;
   price: string;
+}
+
+interface PendingTutorProfileEdit {
+  tutorId?: number;
+  categoryIds?: number[];
+  subjectIds?: number[];
+  title?: string;
+  introduction?: string;
+  educations?: string[];
+  experiences?: string[];
+  lessonType?: 'ONLINE' | 'OFFLINE' | 'BOTH';
+  locationIds?: number[];
+  styleIds?: number[];
+  goalIds?: number[];
+  prices?: Array<{ className: string; price: number }>;
 }
 
 const GOAL_DESCRIPTIONS: Record<string, string> = {
@@ -49,6 +64,7 @@ function TutorProfileSetupContent() {
   const editType = searchParams.get('edit');
   const editSection = searchParams.get('section');
   const editMode = editType === 'instruments' || editType === 'profile';
+  const instrumentEditMode = editType === 'instruments';
   const profileEditMode = editType === 'profile';
   const initialStep = editSection === 'introduction' ? 3
     : editSection === 'education' ? 4
@@ -61,7 +77,6 @@ function TutorProfileSetupContent() {
                   : 1;
   const { data: categories, isLoading: categoriesLoading, isError: categoriesError } = useCategoriesQuery();
   const tutorProfileQuery = useTutorProfileQuery(editMode);
-  const saveTutorProfileMutation = useSaveTutorProfileMutation();
   const { data: references, isLoading: referencesLoading, isError: referencesError } = useReferencesQuery();
   const { data: fallbackLocations = [], isLoading: fallbackLocationsLoading, isError: fallbackLocationsError } = useLocationsQuery(referencesError);
   const locations = references?.locations ?? fallbackLocations;
@@ -91,6 +106,15 @@ function TutorProfileSetupContent() {
   useEffect(() => {
     if (!editMode || !categories || !tutorProfileQuery.data) return;
     const profile = tutorProfileQuery.data;
+
+    let existingDraft: PendingTutorProfileEdit | null = null;
+    try {
+      const raw = sessionStorage.getItem('pending-tutor-profile-edit');
+      if (raw) existingDraft = JSON.parse(raw);
+    } catch {
+      existingDraft = null;
+    }
+
     const profileCategoryNames = profile.categories.map((category) => category.categoryType);
     const profileSubjectNames = profile.subjects.map((subject) => subject.subjectType);
     const matchedCategories = categories.filter((category) =>
@@ -99,28 +123,57 @@ function TutorProfileSetupContent() {
       profileCategoryNames.includes(category.description ?? ''),
     );
     startTransition(() => {
-      setSelectedCategoryIds(matchedCategories.map((category) => category.categoryId));
-      setSelectedSubjects(matchedCategories.flatMap((category) => category.subjects)
-        .filter((subject) => profileSubjectNames.includes(subject.subjectName) || profileSubjectNames.includes(subject.description ?? ''))
-        .map((subject) => subject.subjectId));
-      setActiveCategoryId(matchedCategories[0]?.categoryId ?? null);
+      if (existingDraft?.categoryIds) {
+        setSelectedCategoryIds(existingDraft.categoryIds);
+        setSelectedSubjects(existingDraft.subjectIds ?? []);
+        setActiveCategoryId(existingDraft.categoryIds[0] ?? null);
+      } else {
+        setSelectedCategoryIds(matchedCategories.map((category) => category.categoryId));
+        setSelectedSubjects(matchedCategories.flatMap((category) => category.subjects)
+          .filter((subject) => profileSubjectNames.includes(subject.subjectName) || profileSubjectNames.includes(subject.description ?? ''))
+          .map((subject) => subject.subjectId));
+        setActiveCategoryId(matchedCategories[0]?.categoryId ?? null);
+      }
+
       if (profileEditMode) {
-        setTitle(profile.title ?? '');
-        setIntroduction(profile.introduction ?? '');
-        setEducations(profile.educations ?? []);
-        setExperiences(profile.experiences ?? (profile.career ? profile.career.split('\n') : []));
-        setLessonType(profile.lessonType ?? 'ONLINE');
-        setSelectedLocations(profile.locations.map((location) => location.locationId));
-        setSelectedStyles(profile.styles.map((style) => style.id).filter((id): id is number => id !== undefined));
-        setSelectedGoals((profile.goals ?? []).map((goal) => goal.goalId).filter((id): id is number => id !== undefined));
-        setLessonPrices((profile.prices ?? []).map((price, index) => ({
-          id: index + 1,
-          name: price.className ?? '',
-          price: String(price.price ?? ''),
-        })));
+        setTitle(existingDraft?.title !== undefined ? existingDraft.title : (profile.title ?? ''));
+        setIntroduction(existingDraft?.introduction !== undefined ? existingDraft.introduction : (profile.introduction ?? ''));
+        setEducations(existingDraft?.educations !== undefined ? existingDraft.educations : (profile.educations ?? []));
+        setExperiences(existingDraft?.experiences !== undefined ? existingDraft.experiences : (profile.experiences ?? (profile.career ? profile.career.split('\n') : [])));
+        setLessonType(existingDraft?.lessonType !== undefined ? existingDraft.lessonType : (profile.lessonType ?? 'ONLINE'));
+        const resolvedLocationIds = existingDraft?.locationIds !== undefined ? existingDraft.locationIds : profile.locations.map((location) => location.locationId);
+        setSelectedLocations(resolvedLocationIds);
+        if (resolvedLocationIds.length > 0) {
+          const parentIdsToExpand = locations
+            .filter((loc) => loc.parentId === null)
+            .filter((parent) =>
+              locations
+                .filter((loc) => loc.parentId === parent.locationId)
+                .some((child) => resolvedLocationIds.includes(child.locationId)),
+            )
+            .map((parent) => parent.locationId);
+          if (parentIdsToExpand.length > 0) {
+            setExpandedLocationIds(parentIdsToExpand);
+          }
+        }
+        setSelectedStyles(existingDraft?.styleIds !== undefined ? existingDraft.styleIds : profile.styles.map((style) => style.id).filter((id): id is number => id !== undefined));
+        setSelectedGoals(existingDraft?.goalIds !== undefined ? existingDraft.goalIds : (profile.goals ?? []).map((goal) => goal.goalId).filter((id): id is number => id !== undefined));
+        if (existingDraft?.prices !== undefined) {
+          setLessonPrices(existingDraft.prices.map((price, index) => ({
+            id: index + 1,
+            name: price.className ?? '',
+            price: String(price.price ?? ''),
+          })));
+        } else {
+          setLessonPrices((profile.prices ?? []).map((price, index) => ({
+            id: index + 1,
+            name: price.className ?? '',
+            price: String(price.price ?? ''),
+          })));
+        }
       }
     });
-  }, [categories, editMode, profileEditMode, tutorProfileQuery.data]);
+  }, [categories, editMode, locations, profileEditMode, tutorProfileQuery.data]);
 
   const toggleCategory = (categoryId: number) => {
     setSelectedCategoryIds((current) =>
@@ -141,10 +194,24 @@ function TutorProfileSetupContent() {
       setErrorMessage('악기와 세부 분야를 하나 이상 선택해 주세요.');
       return;
     }
-    saveTutorProfileMutation.mutate({ categoryIds, subjectIds }, {
-      onSuccess: () => router.push('/tutor-profile'),
-      onError: () => setErrorMessage('악기 정보 수정에 실패했습니다. 다시 시도해 주세요.'),
-    });
+
+    let existingDraft: PendingTutorProfileEdit = {};
+    try {
+      const raw = sessionStorage.getItem('pending-tutor-profile-edit');
+      if (raw) existingDraft = JSON.parse(raw);
+    } catch {
+      existingDraft = {};
+    }
+
+    const draft: PendingTutorProfileEdit = {
+      ...existingDraft,
+      tutorId: tutorProfileQuery.data?.tutorId,
+      categoryIds,
+      subjectIds,
+    };
+    sessionStorage.setItem('pending-tutor-profile-edit', JSON.stringify(draft));
+    sessionStorage.setItem('pending-tutor-profile-edit-return', 'true');
+    router.push('/tutor-profile');
   };
 
   const finishSetup = async () => {
@@ -182,29 +249,6 @@ function TutorProfileSetupContent() {
     if (subjectIds.length === 0) {
       setErrorMessage('악기의 세부 분야를 하나 이상 선택해 주세요.');
       setStep(2);
-      return;
-    }
-
-    if (profileEditMode) {
-      saveTutorProfileMutation.mutate({
-        categoryIds,
-        subjectIds,
-        title: title.trim(),
-        introduction: introduction.trim(),
-        lessonType,
-        educations,
-        experiences,
-        locationIds: lessonType === 'ONLINE' ? [] : selectedLocations,
-        styleIds: selectedStyles,
-        goalIds: selectedGoals,
-        prices: lessonPrices.map(({ name, price }) => ({
-          className: name.trim(),
-          price: Number(price),
-        })),
-      }, {
-        onSuccess: () => router.push('/tutor-profile'),
-        onError: () => setErrorMessage('프로필 저장에 실패했습니다. 입력 내용을 확인해 주세요.'),
-      });
       return;
     }
 
@@ -286,6 +330,56 @@ function TutorProfileSetupContent() {
       setSubmitting(false);
     }
   };
+
+  const handleStepAction = (nextStep: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) => {
+    if (profileEditMode) {
+      let existingDraft: PendingTutorProfileEdit = {};
+      try {
+        const raw = sessionStorage.getItem('pending-tutor-profile-edit');
+        if (raw) existingDraft = JSON.parse(raw);
+      } catch {
+        existingDraft = {};
+      }
+
+      const draft: PendingTutorProfileEdit = {
+        ...existingDraft,
+        tutorId: tutorProfileQuery.data?.tutorId,
+        categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : existingDraft.categoryIds,
+        subjectIds: selectedSubjects.length > 0 ? selectedSubjects : existingDraft.subjectIds,
+        title: title.trim(),
+        introduction: introduction.trim(),
+        educations,
+        experiences,
+        lessonType,
+        locationIds: selectedLocations,
+        styleIds: selectedStyles,
+        goalIds: selectedGoals,
+        prices: lessonPrices.map(({ name, price }) => ({
+          className: name.trim(),
+          price: Number(price),
+        })),
+      };
+      sessionStorage.setItem('pending-tutor-profile-edit', JSON.stringify(draft));
+      sessionStorage.setItem('pending-tutor-profile-edit-return', 'true');
+      router.push('/tutor-profile');
+      return;
+    }
+    setStep(nextStep);
+  };
+
+  const leaveEditPage = (path: string) => {
+    router.push(path);
+  };
+
+  useEffect(() => {
+    if (!profileEditMode) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [profileEditMode]);
 
   const addEducation = () => {
     const value = educationInput.trim();
@@ -411,7 +505,17 @@ function TutorProfileSetupContent() {
           )}
 
           <div className="mt-10 flex gap-3">
-            <button type="button" onClick={() => router.push(editMode ? '/tutor-profile' : '/signup')} className="h-13 flex-1 rounded-xl border-2 border-border bg-card text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer">
+            <button
+              type="button"
+              onClick={() => {
+                if (editMode) {
+                  router.push('/tutor-profile');
+                } else {
+                  leaveEditPage('/signup');
+                }
+              }}
+              className="h-13 flex-1 rounded-xl border-2 border-border bg-card text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+            >
               이전
             </button>
             <button
@@ -419,12 +523,11 @@ function TutorProfileSetupContent() {
               disabled={selectedCategoryIds.length === 0}
               onClick={() => {
                 setActiveCategoryId(selectedCategories[0]?.categoryId ?? null);
-                if (editType === 'instruments') completeInstrumentEdit();
-                else setStep(2);
+                setStep(2);
               }}
               className="h-13 flex-[1.8] rounded-xl bg-accent text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer"
             >
-              {editMode ? '수정 완료' : '다음'}
+              {editMode && !instrumentEditMode ? '수정 완료' : '다음'}
             </button>
           </div>
         </section>
@@ -470,7 +573,7 @@ function TutorProfileSetupContent() {
           {selectedSubjects.length === 0 && <p className="mt-4 text-xs text-muted-foreground">세부 분야를 하나 이상 선택해주세요.</p>}
           <div className="mt-10 flex gap-3">
             <button type="button" onClick={() => setStep(1)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button>
-            <button type="button" disabled={selectedSubjects.length === 0} onClick={() => setStep(3)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">다음</button>
+            <button type="button" disabled={selectedSubjects.length === 0} onClick={() => instrumentEditMode ? completeInstrumentEdit() : handleStepAction(3)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">{instrumentEditMode || profileEditMode ? '수정 완료' : '다음'}</button>
           </div>
         </section>
       ) : step === 3 ? (
@@ -510,16 +613,16 @@ function TutorProfileSetupContent() {
           {errorMessage && <p className="mt-5 text-sm text-red-500">{errorMessage}</p>}
 
           <div className="mt-9 flex gap-3">
-            <button type="button" onClick={() => setStep(2)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer">
-              <span className="inline-flex items-center gap-1"><ArrowLeft size={15} /> 이전</span>
+            <button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(2)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer">
+              <span className="inline-flex items-center gap-1"><ArrowLeft size={15} /> {editMode ? '돌아가기' : '이전'}</span>
             </button>
             <button
               type="button"
               disabled={!title.trim() || !introduction.trim() || submitting}
-              onClick={() => setStep(4)}
+              onClick={() => handleStepAction(4)}
               className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer"
             >
-              다음
+              {profileEditMode ? '수정 완료' : '다음'}
             </button>
           </div>
         </section>
@@ -547,7 +650,7 @@ function TutorProfileSetupContent() {
               </>
               )}
           </div>
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(3)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(5)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(3)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{editMode ? '돌아가기' : '이전'}</button><button type="button" onClick={() => handleStepAction(5)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">{profileEditMode ? '수정 완료' : '다음'}</button></div>
         </section>
       ) : step === 5 ? (
         <section>
@@ -573,7 +676,7 @@ function TutorProfileSetupContent() {
               </>
               )}
           </div>
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(4)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(6)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(4)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{editMode ? '돌아가기' : '이전'}</button><button type="button" onClick={() => handleStepAction(6)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">{profileEditMode ? '수정 완료' : '다음'}</button></div>
         </section>
       ) : step === 6 ? (
         <section>
@@ -593,7 +696,7 @@ function TutorProfileSetupContent() {
             ))}
           </div>
           {errorMessage && <p className="mt-5 text-sm text-red-500">{errorMessage}</p>}
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(5)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(7)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(5)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{editMode ? '돌아가기' : '이전'}</button><button type="button" onClick={() => profileEditMode ? setStep(7) : handleStepAction(7)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
         </section>
       ) : step === 7 ? (
         <section>
@@ -682,7 +785,7 @@ function TutorProfileSetupContent() {
 
           {lessonType !== 'ONLINE' && selectedLocations.length === 0 && <p className="mt-3 text-xs text-muted-foreground">대면 수업이 가능한 지역을 하나 이상 선택해주세요.</p>}
           {errorMessage && <p className="mt-5 text-sm text-red-500">{errorMessage}</p>}
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(6)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" disabled={lessonType !== 'ONLINE' && selectedLocations.length === 0} onClick={() => setStep(8)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(6)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" disabled={lessonType !== 'ONLINE' && selectedLocations.length === 0} onClick={() => handleStepAction(8)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">{profileEditMode ? '수정 완료' : '다음'}</button></div>
         </section>
       ) : step === 8 ? (
         <section>
@@ -713,7 +816,7 @@ function TutorProfileSetupContent() {
           </div>
 
           {referencesError && <p className="mt-5 text-sm text-red-500">레슨 목표를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>}
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(7)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(9)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(7)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{editMode ? '돌아가기' : '이전'}</button><button type="button" onClick={() => handleStepAction(9)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">{profileEditMode ? '수정 완료' : '다음'}</button></div>
         </section>
       ) : step === 9 ? (
         <section>
@@ -752,7 +855,7 @@ function TutorProfileSetupContent() {
           </div>
 
           {referencesError && <p className="mt-5 text-sm text-red-500">수업 스타일을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>}
-          <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(8)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" onClick={() => setStep(10)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">다음</button></div>
+          <div className="mt-9 flex gap-3"><button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(8)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{editMode ? '돌아가기' : '이전'}</button><button type="button" onClick={() => handleStepAction(10)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">{profileEditMode ? '수정 완료' : '다음'}</button></div>
         </section>
       ) : (
         <section className="relative">
@@ -818,7 +921,7 @@ function TutorProfileSetupContent() {
             )}
 
             {lessonPrices.length === 3 && <p className="mt-4 text-center text-xs text-muted-foreground">최대 3개까지 등록 가능합니다. (3/3)</p>}
-            <div className="mt-9 flex gap-3"><button type="button" onClick={() => setStep(9)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">이전</button><button type="button" disabled={submitting} onClick={finishSetup} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">{submitting ? '가입 처리 중...' : '등록 완료'}</button></div>
+            <div className="mt-9 flex gap-3"><button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(9)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{editMode ? '돌아가기' : '이전'}</button><button type="button" disabled={submitting} onClick={profileEditMode ? () => handleStepAction(10) : finishSetup} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">{submitting ? '저장 중...' : profileEditMode ? '수정 완료' : '등록 완료'}</button></div>
           </div>
         </section>
       )}

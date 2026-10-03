@@ -53,6 +53,9 @@ function lastMsg(conv: Conversation) {
 function ChatListContent() {
   const searchParams = useSearchParams();
   const targetTutorId = searchParams.get("tutorId") ? Number(searchParams.get("tutorId")) : null;
+  const targetMatchingId = searchParams.get("matchingId") ? Number(searchParams.get("matchingId")) : null;
+  const targetStudentId = searchParams.get("studentId") ? Number(searchParams.get("studentId")) : null;
+  const targetStudentName = searchParams.get("studentName") || "학생";
   const userId = useUserStore((state) => state.userId);
   const role = useUserStore((state) => state.role);
 
@@ -65,6 +68,7 @@ function ChatListContent() {
   const inputRef = useRef<HTMLInputElement>(null);
   const stompClientRef = useRef<Client | null>(null);
   const initializedTargetTutorRef = useRef<number | null>(null);
+  const initializedTargetMatchingRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -103,6 +107,39 @@ function ChatListContent() {
       cancelled = true;
     };
   }, [role, userId]);
+
+  useEffect(() => {
+    if (!targetMatchingId || !userId || initializedTargetMatchingRef.current === targetMatchingId) return;
+
+    const existing = convs.find((conversation) => conversation.matchingId === targetMatchingId);
+    if (existing) {
+      initializedTargetMatchingRef.current = targetMatchingId;
+      const timer = window.setTimeout(() => setSelectedId(existing.id), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    if (role !== "TUTOR" || !targetStudentId) return;
+
+    initializedTargetMatchingRef.current = targetMatchingId;
+    const conversation: Conversation = {
+      id: createConversationId(),
+      roomId: `matching:${targetMatchingId}`,
+      matchingId: targetMatchingId,
+      studentId: targetStudentId,
+      tutorId: userId,
+      tutorName: targetStudentName,
+      tutorAvatar: CHAT_AVATAR,
+      tutorSubject: "레슨 매칭",
+      online: false,
+      unread: 0,
+      messages: [],
+    };
+    const timer = window.setTimeout(() => {
+      setConvs((prev) => [conversation, ...prev]);
+      setSelectedId(conversation.id);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [convs, role, targetMatchingId, targetStudentId, targetStudentName, userId]);
 
   useEffect(() => {
     if (!targetTutorId || !userId || role !== "STUDENT" || initializedTargetTutorRef.current === targetTutorId) return;
@@ -254,6 +291,7 @@ function ChatListContent() {
           matchingId: selectedMatchingId,
           studentId: selectedStudentId,
           tutorId: selectedTutorId,
+          senderId: userId,
           message: text,
         }),
       });

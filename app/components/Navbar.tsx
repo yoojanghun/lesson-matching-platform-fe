@@ -40,6 +40,16 @@ export default function Navbar() {
   const otherRole = currentRole === "STUDENT" ? "TUTOR" : "STUDENT";
   const hasOtherRole = hydrated && availableRoles.includes(otherRole as "STUDENT" | "TUTOR");
 
+  const confirmLeaveWithUnsavedTutorEdit = () => {
+    if (typeof window === "undefined" || !sessionStorage.getItem("pending-tutor-profile-edit")) return true;
+    const shouldLeave = window.confirm("저장하지 않은 프로필 변경사항이 있습니다. 페이지를 이동하면 변경사항이 사라집니다. 이동하시겠습니까?");
+    if (shouldLeave) {
+      sessionStorage.removeItem("pending-tutor-profile-edit");
+      sessionStorage.removeItem("pending-tutor-profile-edit-return");
+    }
+    return shouldLeave;
+  };
+
   const handleRoleSwitch = async () => {
     // 1. 현재 학생인데 튜터 등록 이력이 없는 경우 -> 10단계 튜터 프로필 설정 페이지로 이동
     if (currentRole === "STUDENT" && !hasOtherRole) {
@@ -81,7 +91,13 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-border backdrop-blur bg-card/95">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="font-bold text-lg tracking-tight text-primary">
+        <Link
+          href="/"
+          onClick={(event) => {
+            if (!confirmLeaveWithUnsavedTutorEdit()) event.preventDefault();
+          }}
+          className="font-bold text-lg tracking-tight text-primary"
+        >
           Tutor<span className="text-accent">Match</span>
         </Link>
 
@@ -91,6 +107,9 @@ export default function Navbar() {
             <Link
               key={path}
               href={path}
+              onClick={(event) => {
+                if (!confirmLeaveWithUnsavedTutorEdit()) event.preventDefault();
+              }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 pathname === path
                   ? "bg-secondary text-primary font-semibold"
@@ -131,7 +150,10 @@ export default function Navbar() {
                   <button
                     type="button"
                     disabled={switching}
-                    onClick={handleRoleSwitch}
+                    onClick={() => {
+                      if (!confirmLeaveWithUnsavedTutorEdit()) return;
+                      handleRoleSwitch();
+                    }}
                     className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <ArrowLeftRight size={16} />
@@ -146,6 +168,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => {
+                      if (!confirmLeaveWithUnsavedTutorEdit()) return;
                       logout();
                       setProfileMenuOpen(false);
                     }}
@@ -190,7 +213,13 @@ export default function Navbar() {
             <Link
               key={path}
               href={path}
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(event) => {
+                if (!confirmLeaveWithUnsavedTutorEdit()) {
+                  event.preventDefault();
+                  return;
+                }
+                setMobileMenuOpen(false);
+              }}
               className="block w-full text-left px-3 py-2 rounded-lg text-sm text-foreground hover:bg-muted"
             >
               {label}

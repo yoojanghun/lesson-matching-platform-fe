@@ -201,6 +201,7 @@ function TutorsContent() {
   };
 
   const appliedFilters = [
+    ...(appliedSearchQuery ? [{ label: "검색어", value: appliedSearchQuery, type: "search" as const }] : []),
     ...(appliedSort ? [{ label: "정렬", value: appliedSort, type: "sort" as const }] : []),
     ...(appliedSubject
       ? [{ label: "서비스", value: appliedSubject, type: "service" as const }]

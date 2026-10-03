@@ -125,6 +125,7 @@ function toTutor(response: TutorCardResponse): Tutor {
     rating: response.averageRating ?? 0,
     reviews: response.reviewCount ?? 0,
     price: response.priceRange?.minPrice ?? 0,
+    priceMax: response.priceRange?.maxPrice,
     tags: [...new Set(subjects ?? [])],
     intro: response.title ?? '',
     avatar: '/icons/categories/music.svg',
@@ -136,7 +137,9 @@ function toTutorFromProfile(response: TutorProfileResponse): Tutor {
   const subjects = response.subjects?.map((item) => displaySubject(item.subjectType)).filter(Boolean) as string[] | undefined;
   const categories = response.categories?.map((item) => displayCategory(item.categoryType)).filter(Boolean) as string[] | undefined;
   const displaySubjects = [...new Set([...(categories ?? []), ...(subjects ?? [])])];
-  const locations = response.locations?.map((item) => item.name).filter(Boolean) as string[] | undefined;
+  const locationEntries = response.locations?.filter((item): item is { locationId?: number; name: string } => Boolean(item.name));
+  const locations = locationEntries?.map((item) => item.name);
+  const locationIds = locationEntries?.map((item) => item.locationId).filter((id): id is number => id !== undefined);
   const prices = response.prices?.map((item) => item.price).filter((price): price is number => price !== undefined) ?? [];
 
   // 백엔드 data.sql의 경력 (experiences: 문자열 배열)을 프론트엔드 Career 객체 형태로 변환
@@ -181,6 +184,7 @@ function toTutorFromProfile(response: TutorProfileResponse): Tutor {
     avatar: '/icons/categories/music.svg',
     available: true,
     lessonLocations: locations,
+    lessonLocationIds: locationIds,
     location: locations?.[0],
     lessonOptions,
     lessonGoals: goals,

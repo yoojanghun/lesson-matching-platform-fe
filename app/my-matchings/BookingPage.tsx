@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Star, MapPin, Video, Clock, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Star, Video, Clock, CheckCircle2 } from "lucide-react";
 import { useCreateBookingMutation } from "../hooks/queries/useBookings";
 import { useTutorDetailQuery } from "../hooks/queries/useTutors";
 import type { StudentMatching } from "../types";
@@ -14,7 +14,6 @@ interface Props {
 }
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const UNAVAILABLE_DAYS = [3, 7, 14, 21, 28];
 
 const TIME_SLOTS = [
   { time: "09:00", available: false },
@@ -75,7 +74,6 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
   const tutorRating = tutorData?.rating ?? 0;
   const tutorReviews = tutorData?.reviews ?? 0;
   const tutorAvatar = tutorData?.avatar ?? '';
-  const tutorLocation = tutorData?.location ?? '';
   const tutorOnline = tutorData?.onlineAvailable ?? false;
   const tutorIntro = tutorData?.intro ?? '';
 
@@ -85,6 +83,7 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   const cells = buildCalendar(calYear, calMonth);
 
@@ -116,16 +115,15 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
     t.setHours(0, 0, 0, 0);
     return d < t;
   };
-  const isUnavailable = (day: number) => UNAVAILABLE_DAYS.includes(day);
-
   const handleDayClick = (day: number) => {
-    if (isPast(day) || isUnavailable(day)) return;
+    if (isPast(day)) return;
     setSelectedDay(day);
     setSelectedTime(null);
   };
 
   const handleConfirm = () => {
     if (!selectedDay || !selectedTime) return;
+    setBookingError(null);
 
     const pad = (n: number) => String(n).padStart(2, "0");
     const dateStr = `${calYear}-${pad(calMonth + 1)}-${pad(selectedDay)}`;
@@ -147,6 +145,10 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
       onSuccess: () => {
         setConfirmed(true);
         setTimeout(() => onConfirm(), 1800);
+      },
+      onError: (error) => {
+        const responseMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+        setBookingError(responseMessage ?? '예약 신청에 실패했습니다. 잠시 후 다시 시도해 주세요.');
       },
     });
   };
@@ -227,12 +229,6 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
             <span className="text-xs text-muted-foreground">({tutorReviews})</span>
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 text-xs text-muted-foreground">
-            {tutorLocation && (
-              <span className="flex items-center gap-1">
-                <MapPin size={11} />
-                {tutorLocation}
-              </span>
-            )}
             {tutorOnline && (
               <span className="flex items-center gap-1">
                 <Video size={11} />
@@ -282,8 +278,7 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
             if (!day) return <div key={idx} />;
 
             const past = isPast(day);
-            const unavail = isUnavailable(day);
-            const disabled = past || unavail;
+            const disabled = past;
             const selected = selectedDay === day;
             const dow = idx % 7;
 
@@ -315,9 +310,6 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
                   calMonth === today.getMonth() && (
                     <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent" />
                   )}
-                {unavail && !past && (
-                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-muted-foreground/40" />
-                )}
               </button>
             );
           })}
@@ -326,9 +318,6 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
         <div className="flex gap-4 mt-4 pt-3 border-t border-border text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-accent inline-block" /> 오늘
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-muted-foreground/40 inline-block" /> 예약 불가
           </span>
         </div>
       </div>
@@ -446,12 +435,17 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
           <div className="border-t border-border pt-3 text-xs text-muted-foreground">
             예약 신청 후 튜터가 확정해야 최종 예약이 완료됩니다.
           </div>
+          {bookingError && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
+              {bookingError}
+            </p>
+          )}
           <button
             onClick={handleConfirm}
             disabled={createBookingMutation.isPending || !matching.tutorId}
             className="w-full py-3 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/90 transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-sm"
           >
-            <CheckCircle2 size={15} /> 예약 신청하기
+            <CheckCircle2 size={15} /> {createBookingMutation.isPending ? '예약 신청 중...' : '예약 신청하기'}
           </button>
         </div>
       )}

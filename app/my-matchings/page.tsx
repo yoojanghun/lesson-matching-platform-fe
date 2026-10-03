@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   GraduationCap,
@@ -34,7 +35,6 @@ import type { CalEvent } from "../components/MiniCalendar";
 
 // Code Splitting (Dynamic Imports for heavy components & modals)
 const PaymentModal = dynamic(() => import("../components/PaymentModal"), { ssr: false });
-const TossPaymentModal = dynamic(() => import("../components/TossPaymentModal"), { ssr: false });
 const LessonFeeModal = dynamic(() => import("../components/LessonFeeModal"), { ssr: false });
 const ApproveRejectModal = dynamic(() => import("../components/ApproveRejectModal"), { ssr: false });
 const TutorRevenuePanel = dynamic(() => import("../components/TutorRevenuePanel"), { ssr: false });
@@ -98,6 +98,7 @@ const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
 const WDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export default function MyMatchingsPage() {
+  const router = useRouter();
   const role = useUserStore((s) => s.role);
   const isTutor = role === "TUTOR";
 
@@ -180,7 +181,6 @@ export default function MyMatchingsPage() {
     null
   );
   const [payingItem, setPayingItem] = useState<PaymentItem | null>(null);
-  const [tossPaymentTarget, setTossPaymentTarget] = useState<StudentMatching | null>(null);
 
   const [bookingSelDate, setBookingSelDate] = useState<string | null>(todayStr);
   const [bookingPopup, setBookingPopup] = useState<string | null>(null);
@@ -414,19 +414,7 @@ export default function MyMatchingsPage() {
                     </div>
                     <div className="flex items-center gap-2 h-11 justify-end">
                       {isAccepted ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTossPaymentTarget(m);
-                            }}
-                            className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
-                          >
-                            <CreditCard size={12} /> 결제
-                          </button>
-                          <ChevronRight size={16} className="text-primary" />
-                        </>
+                        <ChevronRight size={16} className="text-primary" />
                       ) : (
                         <span className="w-4" />
                       )}
@@ -1089,16 +1077,6 @@ export default function MyMatchingsPage() {
         );
       })()}
 
-      {/* Toss 결제 모달 */}
-      {tossPaymentTarget && (
-        <TossPaymentModal
-          matchingId={tossPaymentTarget.id}
-          tutorName={tossPaymentTarget.tutor}
-          subject={tossPaymentTarget.subject}
-          onClose={() => setTossPaymentTarget(null)}
-        />
-      )}
-
       {/* 결제 모달 (내부/모의) */}
       {payingItem && (
         <PaymentModal
@@ -1129,6 +1107,13 @@ export default function MyMatchingsPage() {
         <ApproveRejectModal
           matching={approveModalTarget}
           onClose={() => setApproveModalTarget(null)}
+          onChat={() => {
+            const studentParams = approveModalTarget.studentId
+              ? `&studentId=${approveModalTarget.studentId}&studentName=${encodeURIComponent(approveModalTarget.student)}`
+              : '';
+            router.push(`/chat?matchingId=${approveModalTarget.id}${studentParams}`);
+            setApproveModalTarget(null);
+          }}
           onApprove={(id) => {
             updateMatchingStatusMutation.mutate({ id, status: "accepted" });
             setApproveModalTarget(null);
@@ -1152,6 +1137,10 @@ export default function MyMatchingsPage() {
             message: lessonReqModal.message,
           }}
           onClose={() => setLessonReqModal(null)}
+          onChat={() => {
+            router.push("/chat");
+            setLessonReqModal(null);
+          }}
           onApprove={(id) => {
             updateReservationStatusMutation.mutate({ reservationId: id, status: "confirmed" });
             setLessonReqModal(null);

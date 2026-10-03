@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from "react";
-import { X, User, BookOpen, Clock, MessageSquare, CheckCircle2, XCircle } from "lucide-react";
+import { X, User, BookOpen, Clock, MessageSquare, MessageCircle, CheckCircle2, XCircle } from "lucide-react";
 
 interface MatchingLike {
   id: number;
@@ -15,11 +15,12 @@ interface MatchingLike {
 interface Props {
   matching: MatchingLike;
   onClose: () => void;
+  onChat: () => void;
   onApprove: (id: number) => void;
   onReject: (id: number) => void;
 }
 
-export default function ApproveRejectModal({ matching, onClose, onApprove, onReject }: Props) {
+export default function ApproveRejectModal({ matching, onClose, onChat, onApprove, onReject }: Props) {
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
 
   const handleApprove = () => {
@@ -85,7 +86,17 @@ export default function ApproveRejectModal({ matching, onClose, onApprove, onRej
         </div>
 
         {/* 버튼 */}
-        <div className="px-6 pb-6 flex gap-3">
+        {/* 버튼 */}
+        <div className="px-6 pb-6 space-y-3">
+          <button
+            onClick={onChat}
+            disabled={action !== null}
+            className="w-full py-3 rounded-2xl text-sm font-bold transition-colors cursor-pointer flex items-center justify-center gap-2 border border-primary/25 bg-primary/5 text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <MessageCircle size={15} />
+            1:1 채팅
+          </button>
+          <div className="flex gap-3">
           <button
             onClick={handleReject}
             disabled={action !== null}
@@ -114,6 +125,7 @@ export default function ApproveRejectModal({ matching, onClose, onApprove, onRej
             <CheckCircle2 size={15} />
             {action === "approve" ? "승인됨" : "승인"}
           </button>
+          </div>
         </div>
       </div>
     </div>

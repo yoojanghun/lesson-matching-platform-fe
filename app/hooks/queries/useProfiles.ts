@@ -45,6 +45,7 @@ export interface StudentProfileResponse {
 }
 
 export interface TutorProfileResponse {
+  tutorId: number;
   name: string;
   gender: string;
   birthDate: string;

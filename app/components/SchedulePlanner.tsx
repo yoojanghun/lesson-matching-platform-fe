@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { RotateCcw, Copy, CheckCircle2, Clock } from "lucide-react";
 import { useUserStore } from "../store/useUserStore";
 import { useSaveWeeklyScheduleMutation, useTutorScheduleQuery } from "../hooks/queries/useSchedules";
+import { useTutorProfileQuery } from "../hooks/queries/useProfiles";
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 type Day = typeof DAYS[number];
@@ -100,22 +101,23 @@ function formatRanges(slots: Set<number>): string {
 
 export default function SchedulePlanner() {
   const role = useUserStore((state) => state.role);
-  const userId = useUserStore((state) => state.userId);
-  const scheduleQuery = useTutorScheduleQuery(role === "TUTOR" ? userId ?? undefined : undefined);
-  const saveWeeklyScheduleMutation = useSaveWeeklyScheduleMutation(userId ?? undefined);
+  const { data: tutorProfile } = useTutorProfileQuery(role === "TUTOR");
+  const tutorId = tutorProfile?.tutorId;
+  const scheduleQuery = useTutorScheduleQuery(role === "TUTOR" ? tutorId : undefined);
+  const saveWeeklyScheduleMutation = useSaveWeeklyScheduleMutation(tutorId);
   const [week, setWeek] = useState<WeekSlots>(makeEmpty);
   const [saved, setSaved] = useState(false);
-  const hydratedRef = useRef(false);
   const weekRef = useRef<WeekSlots>(week);
 
   const baseRef = useRef<WeekSlots | null>(null);
   const dragRef = useRef<{ day: Day; start: number; mode: "on" | "off" } | null>(null);
 
-  weekRef.current = week;
+  useEffect(() => {
+    weekRef.current = week;
+  }, [week]);
 
   useEffect(() => {
-    if (!scheduleQuery.data || hydratedRef.current) return;
-    hydratedRef.current = true;
+    if (!scheduleQuery.data) return;
     const nextWeek = makeEmpty();
 
     scheduleQuery.data.weeklySchedules.forEach((schedule) => {

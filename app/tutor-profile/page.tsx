@@ -1,6 +1,6 @@
 'use client';
 
-import React, { startTransition, useState, useEffect } from 'react';
+import React, { startTransition, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   User,
@@ -18,6 +18,7 @@ import {
   Eye,
   EyeOff,
   X,
+  Info,
 } from 'lucide-react';
 import { useUserStore } from '../store/useUserStore';
 import LoginGate from '../components/LoginGate';
@@ -146,9 +147,25 @@ const INPUT_BASE = "w-full px-4 py-3 border border-border rounded-xl text-sm tex
 let _id = 100;
 const uid = () => ++_id;
 
+interface PendingTutorProfileEdit {
+  tutorId?: number;
+  categoryIds?: number[];
+  subjectIds?: number[];
+  title?: string;
+  introduction?: string;
+  educations?: string[];
+  experiences?: string[];
+  lessonType?: 'ONLINE' | 'OFFLINE' | 'BOTH';
+  locationIds?: number[];
+  styleIds?: number[];
+  goalIds?: number[];
+  prices?: Array<{ className: string; price: number }>;
+}
+
 export default function TutorProfilePage() {
   const router = useRouter();
   const role = useUserStore((state) => state.role);
+  const userId = useUserStore((state) => state.userId);
   const { data: categories } = useCategoriesQuery();
   const { data: references } = useReferencesQuery(role !== 'GUEST');
   const userName = useUserStore((state) => state.userName);
@@ -167,6 +184,7 @@ export default function TutorProfilePage() {
   const [phoneNumberPublic, setPhoneNumberPublic] = useState(true);
   const [location, setLocation] = useState("");
   const [subjects, setSubjects] = useState<string[]>(["피아노"]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([]);
   const [goals, setGoals] = useState<string[]>([]);
 
   /* 학력 */
@@ -199,6 +217,10 @@ export default function TutorProfilePage() {
   /* 저장 */
   const [saved, setSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [pendingCategoryIds, setPendingCategoryIds] = useState<number[] | null>(null);
+  const [pendingSubjectIds, setPendingSubjectIds] = useState<number[] | null>(null);
+  const [pendingLocationIds, setPendingLocationIds] = useState<number[] | null>(null);
+  const pendingDraftAppliedRef = useRef(false);
 
   // 저장된 프로필이 있다면 불러오기
   useEffect(() => {
@@ -236,6 +258,11 @@ export default function TutorProfilePage() {
     const profile = profileQuery.data;
     if (!profile) return;
 
+    // sessionStorage에 아직 저장되지 않은 수정 초안이 있다면 서버 데이터로 덮어쓰지 않음
+    if (typeof window !== 'undefined' && sessionStorage.getItem('pending-tutor-profile-edit')) {
+      return;
+    }
+
     startTransition(() => {
       setName(profile.name || userName || '');
       setBirthDate(profile.birthDate || '');
@@ -246,6 +273,7 @@ export default function TutorProfilePage() {
       setPhoneNumberPublic(profile.phoneNumberPublic ?? true);
       setLocation(profile.locations?.map((locationItem) => locationItem.name).join(', ') ?? '');
       setSubjects(profile.subjects?.map((subject) => subject.subjectType ?? '').filter(Boolean) ?? []);
+      setSelectedSubjectIds(profile.subjects?.map((subject) => subject.subjectId).filter((id): id is number => id !== undefined) ?? []);
       setGoals(profile.goals?.map((goal) => goal.description ?? '').filter(Boolean) ?? []);
       setTeachStyles(profile.styles?.map((style) => style.description ?? '').filter(Boolean) ?? []);
       setTeachNote(profile.content ?? '');
@@ -267,7 +295,130 @@ export default function TutorProfilePage() {
       }
       setLessonType(profile.lessonType === 'OFFLINE' ? '대면 수업' : profile.lessonType === 'ONLINE' ? '온라인 수업' : profile.lessonType === 'BOTH' ? '둘 다 가능' : '');
     });
-  }, [categories, profileQuery.data, references, userName]);
+  }, [categories, profileQuery.data, references, userName, userId]);
+
+  useEffect(() => {
+    if (!categories || !references || typeof window === 'undefined') return;
+    const rawDraft = sessionStorage.getItem('pending-tutor-profile-edit');
+    if (!rawDraft) return;
+
+    let draft: PendingTutorProfileEdit;
+    try {
+      draft = JSON.parse(rawDraft) as PendingTutorProfileEdit;
+    } catch {
+      sessionStorage.removeItem('pending-tutor-profile-edit');
+      sessionStorage.removeItem('pending-tutor-profile-edit-return');
+      return;
+    }
+
+    startTransition(() => {
+      if (draft.categoryIds && draft.categoryIds.length > 0) {
+        setPendingCategoryIds(draft.categoryIds);
+      }
+      if (draft.subjectIds && draft.subjectIds.length > 0) {
+        setPendingSubjectIds(draft.subjectIds);
+        setSelectedSubjectIds(draft.subjectIds);
+        const allSubjects = categories.flatMap((category) => category.subjects);
+        const mappedSubjects = allSubjects
+          .filter((subject) => draft.subjectIds?.includes(subject.subjectId))
+          .map((subject) => subject.description || subject.subjectName);
+        if (mappedSubjects.length > 0) {
+          setSubjects(mappedSubjects);
+        }
+      }
+      if (draft.title !== undefined) setTitle(draft.title);
+      if (draft.introduction !== undefined) setIntro(draft.introduction);
+      if (draft.educations !== undefined) setEducations(draft.educations.map((text, index) => ({ id: index + 1, text })));
+      if (draft.experiences !== undefined) setCareers(draft.experiences.map((text, index) => ({ id: index + 1, text })));
+      if (draft.lessonType !== undefined) {
+        setLessonType(draft.lessonType === 'OFFLINE' ? '대면 수업' : draft.lessonType === 'ONLINE' ? '온라인 수업' : '둘 다 가능');
+      }
+      if (draft.locationIds !== undefined) {
+        setPendingLocationIds(draft.locationIds);
+        setLocation(references.locations.filter((item) => draft.locationIds?.includes(item.locationId)).map((item) => item.name).join(', '));
+      }
+      if (draft.styleIds !== undefined) {
+        setTeachStyles(references.tutorStyles.filter((style) => draft.styleIds?.includes(style.id)).map((style) => style.description));
+      }
+      if (draft.goalIds !== undefined) {
+        setGoals(references.lessonGoals.filter((goal) => draft.goalIds?.includes(goal.goalId)).map((goal) => goal.description));
+      }
+      if (draft.prices !== undefined) {
+        setFees(draft.prices.map((price, index) => ({ id: index + 1, type: price.className, duration: '60분', price: String(price.price) })));
+      }
+    });
+
+    const savedScrollPos = sessionStorage.getItem('tutor-profile-scroll-y');
+    if (savedScrollPos !== null) {
+      sessionStorage.removeItem('tutor-profile-scroll-y');
+      const targetY = parseInt(savedScrollPos, 10);
+      if (!Number.isNaN(targetY)) {
+        setTimeout(() => {
+          window.scrollTo({ top: targetY, behavior: 'auto' });
+        }, 50);
+      }
+    }
+  }, [categories, references]);
+
+  // 페이지 새로고침 / 탭 닫기 시 미저장 변경사항 경고
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (typeof window !== 'undefined' && sessionStorage.getItem('pending-tutor-profile-edit')) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  // 수정 페이지로 이동하기 전 현재 화면의 상태를 초안(sessionStorage)에 동기화
+  const syncCurrentStateToDraft = () => {
+    if (typeof window === 'undefined') return;
+    sessionStorage.setItem('tutor-profile-scroll-y', String(window.scrollY));
+    let existingDraft: PendingTutorProfileEdit = {};
+    try {
+      const raw = sessionStorage.getItem('pending-tutor-profile-edit');
+      if (raw) existingDraft = JSON.parse(raw);
+    } catch {
+      existingDraft = {};
+    }
+
+    const draft: PendingTutorProfileEdit = {
+      ...existingDraft,
+      tutorId: profileQuery.data?.tutorId,
+      categoryIds: pendingCategoryIds ?? existingDraft.categoryIds ?? (
+        selectedSubjectIds.length > 0
+          ? categories?.filter((cat) => cat.subjects.some((sub) => selectedSubjectIds.includes(sub.subjectId))).map((cat) => cat.categoryId)
+          : undefined
+      ),
+      subjectIds: pendingSubjectIds ?? existingDraft.subjectIds ?? (selectedSubjectIds.length > 0 ? selectedSubjectIds : undefined),
+      title: title.trim(),
+      introduction: intro.trim(),
+      educations: educations.filter((item) => item.text.trim()).map((item) => item.text.trim()),
+      experiences: careers.filter((item) => item.text.trim()).map((item) => item.text.trim()),
+      lessonType: lessonType === '대면 수업' ? 'OFFLINE' : lessonType === '온라인 수업' ? 'ONLINE' : 'BOTH',
+      locationIds: pendingLocationIds ?? existingDraft.locationIds ?? references?.locations.filter((item) => location.split(',').map((val) => val.trim()).includes(item.name)).map((item) => item.locationId),
+      styleIds: references?.tutorStyles.filter((style) => teachStyles.includes(style.description)).map((style) => style.id),
+      goalIds: references?.lessonGoals.filter((goal) => goals.includes(goal.description ?? '')).map((goal) => goal.goalId),
+      prices: fees.filter((fee) => fee.type.trim() && fee.price.trim()).map((fee) => ({
+        className: fee.type.trim(),
+        price: Number(fee.price.replace(/,/g, '')) || 0,
+      })),
+    };
+
+    sessionStorage.setItem('pending-tutor-profile-edit', JSON.stringify(draft));
+  };
+
+  const editSection = (section: string) => {
+    syncCurrentStateToDraft();
+    router.push(`/tutor-profile/setup?edit=profile&section=${section}`);
+  };
+
+  const editInstruments = () => {
+    syncCurrentStateToDraft();
+    router.push('/tutor-profile/setup?edit=instruments');
+  };
 
   const saveProfile = () => {
     const profileData: TutorProfileData = {
@@ -291,6 +442,18 @@ export default function TutorProfilePage() {
       intro,
     };
 
+    const finalCategoryIds = pendingCategoryIds ?? (
+      selectedSubjectIds.length > 0
+        ? categories?.filter((cat) => cat.subjects.some((sub) => selectedSubjectIds.includes(sub.subjectId))).map((cat) => cat.categoryId)
+        : categories?.filter((category) => subjects.includes(category.description) || subjects.includes(category.categoryName)).map((category) => category.categoryId)
+    );
+
+    const finalSubjectIds = pendingSubjectIds ?? (
+      selectedSubjectIds.length > 0
+        ? selectedSubjectIds
+        : categories?.filter((category) => subjects.includes(category.description) || subjects.includes(category.categoryName)).flatMap((category) => category.subjects.map((subject) => subject.subjectId))
+    );
+
     saveProfileMutation.mutate({
       name: name || undefined,
       title: title || undefined,
@@ -300,17 +463,23 @@ export default function TutorProfilePage() {
       birthDatePublic,
       emailPublic,
       phoneNumberPublic,
-      categoryIds: categories?.filter((category) => subjects.includes(category.description)).map((category) => category.categoryId),
-      subjectIds: categories?.filter((category) => subjects.includes(category.description)).flatMap((category) => category.subjects.map((subject) => subject.subjectId)),
+      categoryIds: finalCategoryIds,
+      subjectIds: finalSubjectIds,
       styleIds: references?.tutorStyles.filter((style) => teachStyles.includes(style.description)).map((style) => style.id),
       goalIds: references?.lessonGoals.filter((goal) => goals.includes(goal.description ?? '')).map((goal) => goal.goalId),
-      locationIds: references?.locations.filter((item) => location.split(',').map((value) => value.trim()).includes(item.name)).map((item) => item.locationId),
+      locationIds: pendingLocationIds ?? references?.locations.filter((item) => location.split(',').map((value) => value.trim()).includes(item.name)).map((item) => item.locationId),
+      lessonType: lessonType === '대면 수업' ? 'OFFLINE' : lessonType === '온라인 수업' ? 'ONLINE' : 'BOTH',
       experiences: careers.filter((item) => item.text.trim()).map((item) => item.text.trim()),
       educations: educations.filter((item) => item.text.trim()).map((item) => item.text.trim()),
       prices: fees.filter((item) => item.type.trim() && item.price.trim()).map((item) => ({ className: item.type.trim(), price: Number(item.price.replace(/,/g, '')) || 0 })),
       introduction: intro || undefined,
     }, {
       onSuccess: () => {
+        sessionStorage.removeItem('pending-tutor-profile-edit');
+        sessionStorage.removeItem('pending-tutor-profile-edit-return');
+        setPendingCategoryIds(null);
+        setPendingSubjectIds(null);
+        setPendingLocationIds(null);
         saveTutorProfile(profileData);
         setSaved(true);
         setIsEditing(false);
@@ -328,15 +497,63 @@ export default function TutorProfilePage() {
     );
   }
 
+  if (role === 'TUTOR' && profileQuery.isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl py-20 text-center text-sm text-muted-foreground">
+        내 프로필을 불러오는 중입니다.
+      </div>
+    );
+  }
+
+  if (role === 'TUTOR' && profileQuery.isError && !isEditing) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 py-20 text-center">
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-8">
+          <h2 className="text-base font-bold text-red-800">프로필을 불러오지 못했습니다.</h2>
+          <p className="mt-2 text-sm leading-relaxed text-red-700">
+            서버에서 현재 계정의 튜터 정보를 찾지 못했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => profileQuery.refetch()}
+          disabled={profileQuery.isFetching}
+          className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {profileQuery.isFetching ? '다시 불러오는 중...' : '다시 시도'}
+        </button>
+      </div>
+    );
+  }
+
   if (role === 'TUTOR' && !isEditing) {
     const educationItems = educations.filter((item) => item.text.trim());
     const careerItems = careers.filter((item) => item.text.trim());
     const feeItems = fees.filter((item) => item.type.trim() && item.price.trim());
     const teachingCategories = (categories ?? []).map((category) => ({
       category,
-      subjects: category.subjects.filter((subject) => subjects.includes(subject.description) || subjects.includes(subject.subjectName)),
+      subjects: selectedSubjectIds.length > 0
+        ? category.subjects.filter((subject) => selectedSubjectIds.includes(subject.subjectId))
+        : category.subjects.filter((subject) => subjects.includes(subject.description) || subjects.includes(subject.subjectName)),
     })).filter((item) => item.subjects.length > 0);
-    const edit = (section: string) => router.push(`/tutor-profile/setup?edit=profile&section=${section}`);
+    const lessonLocations = [...new Set(location.split(',').map((item) => item.trim()).filter(Boolean))];
+    const locationReferenceByName = new Map((references?.locations ?? []).map((locationItem) => [locationItem.name, locationItem]));
+    const locationReferenceById = new Map((references?.locations ?? []).map((locationItem) => [locationItem.locationId, locationItem]));
+    const selectedLocationReferences = lessonLocations.map((lessonLocation, index) => {
+      const pendingLocationId = pendingLocationIds?.[index];
+      return (pendingLocationId !== undefined ? locationReferenceById.get(pendingLocationId) : undefined)
+        ?? locationReferenceByName.get(lessonLocation);
+    });
+    const locationsByRegion = lessonLocations.reduce<Record<string, string[]>>((groups, lessonLocation, index) => {
+      const reference = selectedLocationReferences[index];
+      const parent = reference?.parentId !== null && reference?.parentId !== undefined
+        ? locationReferenceById.get(reference.parentId)
+        : reference;
+      const region = parent?.name ?? lessonLocation.split(' ')[0];
+      const displayLocation = reference && reference.parentId !== null ? reference.name : lessonLocation;
+      (groups[region] ??= []).push(displayLocation);
+      return groups;
+    }, {});
     const empty = (text: string) => <p className="text-sm italic text-muted-foreground">{text}</p>;
 
     return (
@@ -350,14 +567,46 @@ export default function TutorProfilePage() {
             <div className="space-y-1.5"><div className="flex items-center justify-between"><label className="text-[11px] font-semibold text-muted-foreground">전화번호</label><PrivacyToggle isPublic={phoneNumberPublic} onClick={() => setPhoneNumberPublic((current) => !current)} /></div><input type="tel" placeholder="예) 010-1234-5678" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} className={INPUT_BASE} /></div>
           </div>
         </ProfileSection>
-        <ProfileSection icon="🎵" title="가르치는 악기 / 분야" onEdit={() => router.push('/tutor-profile/setup?edit=instruments')}>{teachingCategories.length ? <div className="space-y-4">{teachingCategories.map(({ category, subjects: categorySubjects }) => <div key={category.categoryId}><p className="mb-2 text-sm font-semibold text-foreground">{category.icon || '🎵'} {category.description || category.categoryName}</p><div className="flex flex-wrap gap-2">{categorySubjects.map((subject) => <span key={subject.subjectId} className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">{subject.description || subject.subjectName}</span>)}</div></div>)}</div> : empty('선택된 악기가 없습니다.')}</ProfileSection>
-        <ProfileSection icon="📝" title="레슨 소개" onEdit={() => edit('introduction')}>{title || intro ? <div className="space-y-2"><p className="text-base font-semibold text-foreground">{title}</p><p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{intro}</p></div> : empty('레슨 소개가 없습니다.')}</ProfileSection>
-        <ProfileSection icon="🎯" title="레슨 목표" onEdit={() => edit('goals')}>{goals.length ? <div className="flex flex-wrap gap-2">{goals.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 레슨 목표가 없습니다.')}</ProfileSection>
-        <ProfileSection icon="🎓" title="학력" onEdit={() => edit('education')}>{educationItems.length ? <ul className="space-y-2">{educationItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 학력이 없습니다.')}</ProfileSection>
-        <ProfileSection icon="💼" title="개인 경력" onEdit={() => edit('experience')}>{careerItems.length ? <ul className="space-y-2">{careerItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 경력이 없습니다.')}</ProfileSection>
-        <ProfileSection icon="📍" title="수업 방식 / 레슨 지역" onEdit={() => edit('location')}><div className="space-y-3"><span className="inline-flex rounded-full border-2 border-accent bg-orange-50 px-3 py-1 text-sm font-semibold text-accent">{lessonType || '수업 형태 미선택'}</span>{location && <div><p className="mb-2 text-xs text-blue-500">레슨 가능 지역</p><div className="flex flex-wrap gap-2">{location.split(',').map((item) => item.trim()).filter(Boolean).map((item) => <span key={item} className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground">{item}</span>)}</div></div>}</div></ProfileSection>
-        <ProfileSection icon="✨" title="수업 스타일" onEdit={() => edit('styles')}>{teachStyles.length ? <div className="flex flex-wrap gap-2">{teachStyles.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 수업 스타일이 없습니다.')}</ProfileSection>
-        <ProfileSection icon="💰" title="레슨 가격" onEdit={() => edit('prices')}>{feeItems.length ? <div className="space-y-3">{feeItems.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3"><span className="text-sm font-semibold text-foreground">{item.type}</span><span className="text-sm font-bold text-accent">{Number(item.price.replace(/,/g, '')).toLocaleString('ko-KR')}원 / {item.duration}</span></div>)}</div> : empty('등록된 레슨 가격이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="🎵" title="가르치는 악기 / 분야" onEdit={editInstruments}>{teachingCategories.length ? <div className="space-y-4">{teachingCategories.map(({ category, subjects: categorySubjects }) => <div key={category.categoryId}><p className="mb-2 text-sm font-semibold text-foreground">{category.icon || '🎵'} {category.description || category.categoryName}</p><div className="flex flex-wrap gap-2">{categorySubjects.map((subject) => <span key={subject.subjectId} className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">{subject.description || subject.subjectName}</span>)}</div></div>)}</div> : empty('선택된 악기가 없습니다.')}</ProfileSection>
+        <ProfileSection icon="📝" title="레슨 소개" onEdit={() => editSection('introduction')}>{title || intro ? <div className="space-y-2"><p className="text-base font-semibold text-foreground">{title}</p><p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{intro}</p></div> : empty('레슨 소개가 없습니다.')}</ProfileSection>
+        <ProfileSection icon="🎯" title="레슨 목표" onEdit={() => editSection('goals')}>{goals.length ? <div className="flex flex-wrap gap-2">{goals.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 레슨 목표가 없습니다.')}</ProfileSection>
+        <ProfileSection icon="🎓" title="학력" onEdit={() => editSection('education')}>{educationItems.length ? <ul className="space-y-2">{educationItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 학력이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="💼" title="개인 경력" onEdit={() => editSection('experience')}>{careerItems.length ? <ul className="space-y-2">{careerItems.map((item) => <li key={item.id} className="flex items-start gap-2.5 text-sm text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item.text}</li>)}</ul> : empty('입력된 경력이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="📍" title="수업 방식 / 레슨 지역" onEdit={() => editSection('lesson')}>
+          <div className="space-y-4">
+            <span className="inline-flex rounded-full border-2 border-accent bg-orange-50 px-3 py-1 text-sm font-semibold text-accent">{lessonType || '수업 형태 미선택'}</span>
+            {lessonLocations.length > 0 && (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">가능한 레슨 장소</p>
+                  <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground">총 {lessonLocations.length}곳</span>
+                </div>
+                {Object.entries(locationsByRegion).map(([region, regionLocations]) => (
+                  <section key={region}>
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="text-sm font-semibold text-foreground">{region}</span>
+                      <div className="h-px flex-1 bg-border" />
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-50 text-[11px] font-semibold text-amber-600">{regionLocations.length}</span>
+                    </div>
+                    <ul className="flex flex-wrap gap-2">
+                      {regionLocations.map((lessonLocation, index) => (
+                        <li key={`${lessonLocation}-${index}`} className="rounded-full border border-amber-200 bg-amber-50/40 px-3 py-1.5 text-sm text-amber-700">
+                          <span className="mr-1 text-amber-500">•</span>{lessonLocation}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+                <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+                  <Info size={13} className="shrink-0 text-slate-400" />
+                  선생님이 직접 방문하거나 학생이 방문하는 방식 모두 협의 가능합니다.
+                </p>
+              </div>
+            )}
+          </div>
+        </ProfileSection>
+        <ProfileSection icon="✨" title="수업 스타일" onEdit={() => editSection('styles')}>{teachStyles.length ? <div className="flex flex-wrap gap-2">{teachStyles.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 수업 스타일이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="💰" title="레슨 가격" onEdit={() => editSection('prices')}>{feeItems.length ? <div className="space-y-3">{feeItems.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3"><span className="text-sm font-semibold text-foreground">{item.type}</span><span className="text-sm font-bold text-accent">{Number(item.price.replace(/,/g, '')).toLocaleString('ko-KR')}원 / {item.duration}</span></div>)}</div> : empty('등록된 레슨 가격이 없습니다.')}</ProfileSection>
         <button type="button" onClick={saveProfile} disabled={saveProfileMutation.isPending} className="w-full rounded-2xl bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-md transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer">{saveProfileMutation.isPending ? '저장 중...' : saved ? '프로필 저장 완료!' : '프로필 저장'}</button>
         <p className="pb-4 text-center text-xs text-muted-foreground">프로필은 언제든지 수정할 수 있습니다.</p>
       </div>
@@ -418,6 +667,7 @@ export default function TutorProfilePage() {
       styleIds: references?.tutorStyles.filter((style) => teachStyles.includes(style.description)).map((style) => style.id),
       goalIds: references?.lessonGoals.filter((goal) => goals.includes(goal.description ?? '')).map((goal) => goal.goalId),
       locationIds: references?.locations.filter((locationItem) => location.split(',').map((item) => item.trim()).includes(locationItem.name)).map((locationItem) => locationItem.locationId),
+      lessonType: lessonType === '대면 수업' ? 'OFFLINE' : lessonType === '온라인 수업' ? 'ONLINE' : 'BOTH',
       experiences: careers.filter((career) => career.text.trim()).map((career) => career.text.trim()),
       educations: educations.filter((education) => education.text.trim()).map((education) => education.text.trim()),
       prices: fees

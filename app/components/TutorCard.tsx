@@ -15,6 +15,7 @@ export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: (
     .map(({ label }) => label);
 
   const hasCustomAvatar = tutor.avatar && !tutor.avatar.includes("music.svg");
+  const hasPriceRange = tutor.priceMax !== undefined && tutor.priceMax > tutor.price;
 
   return (
     <div
@@ -46,7 +47,11 @@ export default function TutorCard({ tutor, onClick }: { tutor: Tutor; onClick: (
               </p>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-sm font-bold text-primary">{tutor.price.toLocaleString()}원</p>
+              <p className="text-sm font-bold text-primary">
+                {hasPriceRange
+                  ? `${tutor.price.toLocaleString()} ~ ${tutor.priceMax?.toLocaleString()}원`
+                  : `${tutor.price.toLocaleString()}원`}
+              </p>
               <p className="text-xs text-muted-foreground">/시간</p>
             </div>
           </div>

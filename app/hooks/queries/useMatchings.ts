@@ -51,6 +51,8 @@ interface StudentMatchingResponse {
 
 interface TutorMatchingResponse {
   matchingId: number;
+  studentId?: number;
+  userId?: number;
   requestMsg: string;
   status: string;
   name: string;
@@ -98,6 +100,7 @@ export function useMatchingsQuery(
         return {
           content: data.content.map((matching) => ({
             id: matching.matchingId,
+            tutorId: matching.tutorId,
             tutor: matching.tutorName,
             subject: matching.subject?.join(' · ') || '레슨',
             date: formatDate(matching.createdAt),
@@ -123,6 +126,7 @@ export function useMatchingsQuery(
       return {
         content: data.content.map((matching) => ({
           id: matching.matchingId,
+          studentId: matching.studentId ?? matching.userId,
           student: matching.name,
           subject: '레슨 매칭',
           date: formatDate(matching.createdAt),

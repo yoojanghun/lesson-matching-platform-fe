@@ -55,12 +55,14 @@ export interface Tutor {
   rating: number;
   reviews: number;
   price: number;
+  priceMax?: number;
   tags: string[];
   intro: string;
   avatar: string;
   available: boolean;
   lessonType?: "대면 수업" | "온라인 수업" | "대면 / 온라인 수업";
   lessonLocations?: string[];
+  lessonLocationIds?: number[];
   birthDate?: string;
   email?: string;
   phoneNumber?: string;
@@ -100,6 +102,7 @@ export interface StudentMatching {
 
 export interface TutorMatching {
   id: number;
+  studentId?: number;
   student: string;
   subject: string;
   date: string;

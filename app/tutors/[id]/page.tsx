@@ -22,6 +22,7 @@ import StarRow from '../../components/StarRow';
 import { useUserStore } from '../../store/useUserStore';
 import { useTutorDetailQuery } from '../../hooks/queries/useTutors';
 import { useReviewsQuery, useCreateReviewMutation } from '../../hooks/queries/useReviews';
+import { useReferencesQuery } from '../../hooks/queries/useReferences';
 import { FloatingChat } from '../../components/ChatPanel';
 
 const DISPLAYABLE_LESSON_GOALS = [
@@ -39,6 +40,7 @@ export default function TutorDetailPage() {
 
   // TanStack Query로 튜터 상세 및 리뷰 데이터 조회 (자동 캐싱)
   const { data: tutorQueryData, isLoading: tutorLoading, isError: tutorError } = useTutorDetailQuery(tutorId);
+  const { data: references } = useReferencesQuery();
   const { data: reviews = [] } = useReviewsQuery(tutorId, role !== 'GUEST');
   const createReviewMutation = useCreateReviewMutation();
   const [showAllReviews, setShowAllReviews] = useState(false);
@@ -69,13 +71,25 @@ export default function TutorDetailPage() {
           : undefined
   );
   const lessonLocations = tutor.lessonLocations?.length
-    ? tutor.lessonLocations
+    ? [...new Set(tutor.lessonLocations)]
     : tutor.location
       ? [tutor.location.replace(/\s*\(대면 가능\)\s*$/, '')]
       : [];
-  const locationsByRegion = lessonLocations.reduce<Record<string, string[]>>((groups, location) => {
-    const [region] = location.split(' ');
-    (groups[region] ??= []).push(location);
+  const locationReferenceById = new Map((references?.locations ?? []).map((location) => [location.locationId, location]));
+  const locationsByRegion = lessonLocations.reduce<Record<string, string[]>>((groups, location, index) => {
+    const reference = tutor.lessonLocationIds?.[index] !== undefined
+      ? locationReferenceById.get(tutor.lessonLocationIds[index])
+      : undefined;
+    const parent = reference?.parentId === null
+      ? reference
+      : reference?.parentId !== undefined
+        ? locationReferenceById.get(reference.parentId)
+        : undefined;
+    const region = parent?.name ?? location.split(' ')[0];
+    const displayLocation = reference && reference.parentId !== null
+      ? reference.name
+      : location;
+    (groups[region] ??= []).push(displayLocation);
     return groups;
   }, {});
   const publicContactItems = [
@@ -298,9 +312,9 @@ export default function TutorDetailPage() {
                   </span>
                 </div>
                 <ul className="flex flex-wrap gap-2">
-                  {locations.map((location) => (
+                  {locations.map((location, index) => (
                     <li
-                      key={location}
+                      key={`${location}-${index}`}
                       className="px-3 py-1.5 rounded-full border border-amber-200 bg-amber-50/40 text-sm text-amber-700"
                     >
                       <span className="mr-1 text-amber-500">•</span>{location}
@@ -531,4 +545,3 @@ export default function TutorDetailPage() {
     </div>
   );
 }
-
