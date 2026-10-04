@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -94,8 +94,39 @@ function ExpandableMessage({ text }: { text: string }) {
   );
 }
 
+function ProfileAvatar({
+  src,
+  alt,
+  className,
+}: {
+  src?: string;
+  alt: string;
+  className: string;
+}) {
+  if (!src) {
+    return (
+      <div className={`${className} bg-secondary flex items-center justify-center`} aria-label={`${alt} 프로필`}>
+        <User size={18} className="text-primary" />
+      </div>
+    );
+  }
+
+  return <img src={src} alt={alt} className={className} />;
+}
+
 const COL = "grid grid-cols-[44px_1fr_90px_auto] items-start gap-x-4";
 const WDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+const STUDENT_TAB_STORAGE_KEY = "my-matchings-active-tab-student";
+const TUTOR_TAB_STORAGE_KEY = "my-matchings-active-tab-tutor";
+const STUDENT_TAB_KEYS = ["requests", "bookings", "payments"] as const;
+const TUTOR_TAB_KEYS = ["received", "lessons", "schedule", "revenue"] as const;
+
+function getSavedTab<T extends readonly string[]>(key: string, tabs: T, fallback: T[number]): T[number] {
+  if (typeof window === "undefined") return fallback;
+  const savedTab = window.localStorage.getItem(key);
+  return tabs.includes(savedTab as T[number]) ? (savedTab as T[number]) : fallback;
+}
 
 export default function MyMatchingsPage() {
   const router = useRouter();
@@ -144,6 +175,28 @@ export default function MyMatchingsPage() {
   const [tutorTab, setTutorTab] = useState<
     "received" | "lessons" | "schedule" | "revenue"
   >("received");
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (isTutor) {
+        setTutorTab(getSavedTab(TUTOR_TAB_STORAGE_KEY, TUTOR_TAB_KEYS, "received"));
+      } else {
+        setActiveTab(getSavedTab(STUDENT_TAB_STORAGE_KEY, STUDENT_TAB_KEYS, "requests"));
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [isTutor]);
+
+  const handleStudentTabChange = (tab: (typeof STUDENT_TAB_KEYS)[number]) => {
+    setActiveTab(tab);
+    window.localStorage.setItem(STUDENT_TAB_STORAGE_KEY, tab);
+  };
+
+  const handleTutorTabChange = (tab: (typeof TUTOR_TAB_KEYS)[number]) => {
+    setTutorTab(tab);
+    window.localStorage.setItem(TUTOR_TAB_STORAGE_KEY, tab);
+  };
 
   // 튜터 매칭 목록 (레슨비 커스텀 지원)
   const tutorMatchings = (matchingsData?.content as TutorMatching[]) ?? [];
@@ -253,7 +306,7 @@ export default function MyMatchingsPage() {
         onBack={() => setBookingMatchingId(null)}
         onConfirm={() => {
           setBookingMatchingId(null);
-          setActiveTab("bookings");
+          handleStudentTabChange("bookings");
         }}
       />
     );
@@ -298,7 +351,7 @@ export default function MyMatchingsPage() {
           {STUDENT_TABS.map(({ key, label, badge }) => (
             <button
               key={key}
-              onClick={() => setActiveTab(key)}
+              onClick={() => handleStudentTabChange(key)}
               className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
                 activeTab === key
                   ? "bg-card text-foreground shadow-sm font-bold"
@@ -328,7 +381,7 @@ export default function MyMatchingsPage() {
           {TUTOR_TABS.map(({ key, label, badge }) => (
             <button
               key={key}
-              onClick={() => setTutorTab(key)}
+              onClick={() => handleTutorTabChange(key)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
                 tutorTab === key
                   ? "bg-card text-foreground shadow-sm font-bold"
@@ -471,7 +524,7 @@ export default function MyMatchingsPage() {
                     i !== lessonBookings.length - 1 ? "border-b border-border" : ""
                   }`}
                 >
-                  <img
+                  <ProfileAvatar
                     src={b.avatar}
                     alt={b.tutor}
                     className="w-11 h-11 rounded-full object-cover shrink-0"
@@ -491,7 +544,6 @@ export default function MyMatchingsPage() {
                     <p className="text-sm font-semibold text-foreground">
                       {b.startTime} – {b.endTime}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">1시간</p>
                   </div>
                   <p className="text-sm font-semibold text-primary">
                     {b.price.toLocaleString()}원
@@ -557,7 +609,7 @@ export default function MyMatchingsPage() {
                   i !== payments.length - 1 ? "border-b border-border" : ""
                 } ${p.status === "unpaid" ? "hover:bg-muted/20" : ""}`}
               >
-                <img
+                <ProfileAvatar
                   src={p.avatar}
                   alt={p.tutor}
                   className="w-11 h-11 rounded-full object-cover shrink-0"
@@ -774,7 +826,6 @@ export default function MyMatchingsPage() {
                     <p className="text-sm font-semibold text-foreground">
                       {r.startTime} – {r.endTime}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">1시간</p>
                   </div>
                   <div>
                     <BookingStatusBadge status={r.status} />
@@ -952,7 +1003,7 @@ export default function MyMatchingsPage() {
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <img
+                      <ProfileAvatar
                         src={b.avatar}
                         alt={b.tutor}
                         className="w-11 h-11 rounded-full object-cover shrink-0"
@@ -1023,7 +1074,7 @@ export default function MyMatchingsPage() {
                   >
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="flex items-center gap-3">
-                        <img
+                        <ProfileAvatar
                           src={p.avatar}
                           alt={p.tutor}
                           className="w-11 h-11 rounded-full object-cover shrink-0"

@@ -22,7 +22,15 @@ export interface TutorScheduleResponse {
   tutorId: number;
   weeklySchedules: WeeklyScheduleResponse[];
   scheduleExceptions: ScheduleExceptionResponse[];
-  reservedSlots: unknown[];
+  reservedSlots: ReservedSlotResponse[];
+}
+
+export interface ReservedSlotResponse {
+  reservationId: number;
+  lessonDate: string;
+  startTime: string;
+  endTime: string;
+  reservationStatus: string;
 }
 
 export interface WeeklyScheduleRequest {
@@ -38,19 +46,20 @@ export interface ScheduleExceptionRequest {
   exceptionType: 'AVAILABLE' | 'UNAVAILABLE';
 }
 
-function formatDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+export function formatScheduleDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-export function useTutorScheduleQuery(tutorId?: number) {
-  const startDate = new Date();
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + 90);
+export function useTutorScheduleQuery(tutorId?: number, startDate = new Date(), endDate?: Date) {
+  const resolvedEndDate = endDate ?? new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000);
 
   return useQuery({
-    queryKey: ['schedules', tutorId, formatDate(startDate), formatDate(endDate)],
+    queryKey: ['schedules', tutorId, formatScheduleDate(startDate), formatScheduleDate(resolvedEndDate)],
     queryFn: () => apiClient.get<TutorScheduleResponse>(`/api/schedules/tutors/${tutorId}`, {
-      params: { startDate: formatDate(startDate), endDate: formatDate(endDate) },
+      params: { startDate: formatScheduleDate(startDate), endDate: formatScheduleDate(resolvedEndDate) },
     }).then((response) => response.data),
     enabled: Boolean(tutorId),
   });

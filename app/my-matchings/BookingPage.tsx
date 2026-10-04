@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Star, Video, Clock, CheckCircle2 } from "lucide-react";
 import { useCreateBookingMutation } from "../hooks/queries/useBookings";
 import { useTutorDetailQuery } from "../hooks/queries/useTutors";
+import { formatScheduleDate, useTutorScheduleQuery } from "../hooks/queries/useSchedules";
 import type { StudentMatching } from "../types";
 
 interface Props {
@@ -15,30 +16,10 @@ interface Props {
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-const TIME_SLOTS = [
-  { time: "09:00", available: false },
-  { time: "09:30", available: false },
-  { time: "10:00", available: true },
-  { time: "10:30", available: true },
-  { time: "11:00", available: true },
-  { time: "11:30", available: true },
-  { time: "12:00", available: false },
-  { time: "12:30", available: false },
-  { time: "13:00", available: true },
-  { time: "13:30", available: true },
-  { time: "14:00", available: true },
-  { time: "14:30", available: true },
-  { time: "15:00", available: false },
-  { time: "15:30", available: false },
-  { time: "16:00", available: true },
-  { time: "16:30", available: true },
-  { time: "17:00", available: true },
-  { time: "17:30", available: true },
-  { time: "18:00", available: true },
-  { time: "18:30", available: true },
-  { time: "19:00", available: false },
-  { time: "19:30", available: false },
-];
+const TIME_SLOTS = Array.from({ length: 32 }, (_, index) => {
+  const minutes = 7 * 60 + index * 30;
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+});
 
 function toKoreanTime(t: string): string {
   const [h, m] = t.split(":").map(Number);
@@ -84,8 +65,49 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const scheduleStartDate = new Date(calYear, calMonth, 1);
+  const scheduleEndDate = new Date(calYear, calMonth + 1, 0);
+  const { data: tutorSchedule, isLoading: scheduleLoading } = useTutorScheduleQuery(
+    tutorId,
+    scheduleStartDate,
+    scheduleEndDate
+  );
 
   const cells = buildCalendar(calYear, calMonth);
+
+  const getSlotMinutes = (time: string) => {
+    const [hour, minute] = time.split(":").map(Number);
+    return hour * 60 + minute;
+  };
+
+  const overlaps = (startTime: string, endTime: string, otherStart: string, otherEnd: string) =>
+    getSlotMinutes(startTime) < getSlotMinutes(otherEnd) &&
+    getSlotMinutes(endTime) > getSlotMinutes(otherStart);
+
+  const getAvailableSlots = (day: number) => {
+    const date = new Date(calYear, calMonth, day);
+    const dateString = formatScheduleDate(date);
+    const dayOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][date.getDay()];
+    const schedules = tutorSchedule?.weeklySchedules.filter((schedule) => schedule.dayOfWeek === dayOfWeek) ?? [];
+    const exceptions = tutorSchedule?.scheduleExceptions.filter((exception) => exception.exceptionDate === dateString) ?? [];
+    const reservations = tutorSchedule?.reservedSlots.filter((reservation) => reservation.lessonDate === dateString) ?? [];
+
+    return TIME_SLOTS.map((time) => {
+      const endTime = addHour(time);
+      const inWeeklySchedule = schedules.some((schedule) =>
+        getSlotMinutes(time) >= getSlotMinutes(schedule.startTime) &&
+        getSlotMinutes(endTime) <= getSlotMinutes(schedule.endTime)
+      );
+      const blockedByException = exceptions.some((exception) =>
+        exception.exceptionType === "UNAVAILABLE" && overlaps(time, endTime, exception.startTime, exception.endTime)
+      );
+      const reserved = reservations.some((reservation) =>
+        overlaps(time, endTime, reservation.startTime, reservation.endTime)
+      );
+
+      return { time, available: inWeeklySchedule && !blockedByException && !reserved };
+    });
+  };
 
   const prevMonth = () => {
     if (calMonth === 0) {
@@ -334,10 +356,19 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
 
           <div className="overflow-x-auto pb-1">
             <div style={{ minWidth: "560px" }}>
+              {scheduleLoading && (
+                <p className="mb-3 text-xs text-muted-foreground">튜터의 스케줄을 불러오는 중입니다.</p>
+              )}
+              {!scheduleLoading && !tutorSchedule && (
+                <p className="mb-3 text-xs text-red-600">튜터의 스케줄을 불러오지 못했습니다.</p>
+              )}
+              {(() => {
+                const timeSlots = getAvailableSlots(selectedDay);
+                return (
+                <>
               <div className="relative h-5 mb-1">
-                {TIME_SLOTS.filter((_, i) => i % 2 === 0).map(({ time }) => {
-                  const idx = TIME_SLOTS.findIndex((s) => s.time === time);
-                  const leftPct = (idx / TIME_SLOTS.length) * 100;
+                {timeSlots.filter((_, i) => i % 2 === 0).map(({ time }, idx) => {
+                  const leftPct = (idx * 2 / timeSlots.length) * 100;
                   return (
                     <span
                       key={time}
@@ -354,12 +385,12 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
               </div>
 
               <div className="flex gap-0.5">
-                {TIME_SLOTS.map(({ time, available }, idx) => {
-                  const nextAvail = TIME_SLOTS[idx + 1]?.available ?? false;
+                {timeSlots.map(({ time, available }, idx) => {
+                  const nextAvail = timeSlots[idx + 1]?.available ?? false;
                   const canSelect = available && nextAvail;
 
                   const isStart = selectedTime === time;
-                  const isEnd = idx > 0 && selectedTime === TIME_SLOTS[idx - 1].time;
+                  const isEnd = idx > 0 && selectedTime === timeSlots[idx - 1].time;
                   const isSelected = isStart || isEnd;
 
                   return (
@@ -386,6 +417,9 @@ export default function BookingPage({ matchingId, matching, onBack, onConfirm }:
                   );
                 })}
               </div>
+                </>
+                );
+              })()}
 
               {selectedTime && (
                 <p className="mt-3 text-sm font-semibold text-primary text-center">
