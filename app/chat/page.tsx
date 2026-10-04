@@ -60,6 +60,7 @@ function ChatListContent() {
   const role = useUserStore((state) => state.role);
 
   const [convs, setConvs] = useState<Conversation[]>([]);
+  const [roomsLoaded, setRoomsLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [input, setInput] = useState("");
   const [isTyping] = useState(false);
@@ -99,6 +100,8 @@ function ChatListContent() {
         })));
       } catch (error) {
         console.error("채팅방 목록 조회 실패", error);
+      } finally {
+        if (!cancelled) setRoomsLoaded(true);
       }
     };
 
@@ -109,7 +112,7 @@ function ChatListContent() {
   }, [role, userId]);
 
   useEffect(() => {
-    if (!targetMatchingId || !userId || initializedTargetMatchingRef.current === targetMatchingId) return;
+    if (!targetMatchingId || !userId || !roomsLoaded || initializedTargetMatchingRef.current === targetMatchingId) return;
 
     const existing = convs.find((conversation) => conversation.matchingId === targetMatchingId);
     if (existing) {
@@ -139,7 +142,7 @@ function ChatListContent() {
       setSelectedId(conversation.id);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [convs, role, targetMatchingId, targetStudentId, targetStudentName, userId]);
+  }, [convs, role, roomsLoaded, targetMatchingId, targetStudentId, targetStudentName, userId]);
 
   useEffect(() => {
     if (!targetTutorId || !userId || role !== "STUDENT" || initializedTargetTutorRef.current === targetTutorId) return;

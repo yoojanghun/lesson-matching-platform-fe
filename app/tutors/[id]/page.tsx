@@ -17,11 +17,12 @@ import {
   Briefcase,
   ChevronDown,
   ChevronUp,
+  Trash2,
 } from 'lucide-react';
 import StarRow from '../../components/StarRow';
 import { useUserStore } from '../../store/useUserStore';
 import { useTutorDetailQuery } from '../../hooks/queries/useTutors';
-import { useReviewsQuery, useCreateReviewMutation } from '../../hooks/queries/useReviews';
+import { useReviewsQuery, useCreateReviewMutation, useDeleteReviewMutation } from '../../hooks/queries/useReviews';
 import { useReferencesQuery } from '../../hooks/queries/useReferences';
 import { FloatingChat } from '../../components/ChatPanel';
 
@@ -37,12 +38,14 @@ export default function TutorDetailPage() {
 
   // Zustand Selector 최적화
   const role = useUserStore((s) => s.role);
+  const userName = useUserStore((s) => s.userName);
 
   // TanStack Query로 튜터 상세 및 리뷰 데이터 조회 (자동 캐싱)
   const { data: tutorQueryData, isLoading: tutorLoading, isError: tutorError } = useTutorDetailQuery(tutorId);
   const { data: references } = useReferencesQuery();
-  const { data: reviews = [] } = useReviewsQuery(tutorId, role !== 'GUEST');
+  const { data: reviews = [] } = useReviewsQuery(tutorId); // GUEST 포함 누구나 리뷰 조회 가능
   const createReviewMutation = useCreateReviewMutation();
+  const deleteReviewMutation = useDeleteReviewMutation();
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -121,14 +124,38 @@ export default function TutorDetailPage() {
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
     if (reviewRating === 0 || reviewText.trim().length < 5) return;
-    createReviewMutation.mutate({
-      tutorId: tutor.id,
-      rating: reviewRating,
-      content: reviewText.trim(),
-    });
-    setReviewText('');
-    setReviewRating(0);
-    setHoverRating(0);
+    createReviewMutation.mutate(
+      {
+        tutorId: tutor.id,
+        rating: reviewRating,
+        content: reviewText.trim(),
+      },
+      {
+        onSuccess: () => {
+          setReviewText('');
+          setReviewRating(0);
+          setHoverRating(0);
+        },
+        onError: (err) => {
+          console.error('[리뷰 등록 실패]', err);
+          alert('리뷰 등록에 실패했습니다. 로그인 상태를 확인해주세요.');
+        },
+      }
+    );
+  };
+
+  const handleDeleteReview = (reviewId: number) => {
+    if (!window.confirm('이 리뷰를 삭제하시겠어요?')) return;
+
+    deleteReviewMutation.mutate(
+      { tutorId: tutor.id, reviewId },
+      {
+        onError: (err) => {
+          console.error('[리뷰 삭제 실패]', err);
+          alert('리뷰 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        },
+      }
+    );
   };
 
   return (
@@ -466,6 +493,18 @@ export default function TutorDetailPage() {
                 <div className="flex items-center gap-2">
                   <StarRow rating={r.rating} size={12} />
                   <span className="text-xs text-muted-foreground">{r.date}</span>
+                  {role === 'STUDENT' && r.student === userName && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteReview(r.id)}
+                      disabled={deleteReviewMutation.isPending}
+                      className="p-1 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-label="내 리뷰 삭제"
+                      title="내 리뷰 삭제"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
               <p className="text-sm text-foreground leading-relaxed">{r.content}</p>

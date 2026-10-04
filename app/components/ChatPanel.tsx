@@ -206,9 +206,6 @@ export function FloatingChat({ tutorName, tutorAvatar, tutorSubject }: FloatingC
         }`}
       >
         <MessageCircle size={24} className="text-white stroke-[2.2]" />
-        <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#e05a2b] text-white text-[11px] font-bold rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-          1
-        </span>
       </button>
     </>
   );

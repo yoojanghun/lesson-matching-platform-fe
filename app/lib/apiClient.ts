@@ -25,7 +25,10 @@ function isPublicApiRequest(url?: string) {
 
   const isExact = PUBLIC_EXACT_PATHS.includes(url);
   const isPrefix = PUBLIC_PREFIX_PATHS.some((path) => url.startsWith(path));
-  const isTutorDetail = url.startsWith('/api/tutors/') && !url.startsWith('/api/matchings');
+  // 공개 튜터 엔드포인트: 튜터 상세 프로필/리뷰 조회만 Public으로 허용
+  // /api/tutors/{id}/reviews (POST), /api/tutors/sync/** 등은 인증 필요 → false
+  const isTutorDetail = /^\/api\/tutors\/[^/]+(\/profile)?$/.test(url) ||
+    /^\/api\/tutors\/[^/]+\/reviews$/.test(url) && false; // reviews는 GET만 공개이나 HTTP method를 여기서 구분 불가이므로 항상 Private 처리
 
   return isExact || isPrefix || isTutorDetail;
 }
