@@ -20,7 +20,13 @@ interface Props {
   onReject: (id: number) => void;
 }
 
-export default function ApproveRejectModal({ matching, onClose, onChat, onApprove, onReject }: Props) {
+export default function ApproveRejectModal({
+  matching,
+  onClose,
+  onChat,
+  onApprove,
+  onReject,
+}: Props) {
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
 
   const handleApprove = () => {
@@ -82,6 +88,7 @@ export default function ApproveRejectModal({ matching, onClose, onChat, onApprov
             <div className="px-4 py-3 bg-muted/30 rounded-xl border border-border/60">
               <p className="text-sm text-foreground leading-relaxed">{matching.message}</p>
             </div>
+
           </div>
         </div>
 

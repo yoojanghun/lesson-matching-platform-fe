@@ -20,6 +20,7 @@ export interface ReservationByMatchingResponse {
   startTime: string;
   endTime: string;
   reservationStatus: string;
+  pricePerLesson?: number | null;
   createdAt: string;
 }
 
@@ -48,6 +49,7 @@ export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT', page = 0
             startTime: string;
             endTime: string;
             reservationStatus: string;
+            pricePerLesson?: number | null;
             createdAt: string;
           }>;
           totalPages?: number;
@@ -71,7 +73,7 @@ export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT', page = 0
             lessonDay: new Date(`${reservation.lessonDate}T00:00:00`).toLocaleDateString('ko-KR', { weekday: 'short' }),
             startTime: reservation.startTime,
             endTime: reservation.endTime,
-            price: 0,
+            price: reservation.pricePerLesson ?? 0,
             status: reservation.reservationStatus === 'CONFIRMED'
               ? 'confirmed'
               : reservation.reservationStatus === 'REJECTED'
@@ -95,6 +97,7 @@ export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT', page = 0
           startTime: string;
           endTime: string;
           reservationStatus: string;
+          pricePerLesson?: number | null;
           createdAt: string;
         }>;
         totalPages?: number;
@@ -118,7 +121,7 @@ export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT', page = 0
           lessonDay: new Date(`${reservation.lessonDate}T00:00:00`).toLocaleDateString('ko-KR', { weekday: 'short' }),
           startTime: reservation.startTime,
           endTime: reservation.endTime,
-          price: 0,
+          price: reservation.pricePerLesson ?? 0,
           status: reservation.reservationStatus === 'CONFIRMED'
             ? 'confirmed'
             : reservation.reservationStatus === 'REJECTED'

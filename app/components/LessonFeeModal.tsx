@@ -7,6 +7,7 @@ import type { TutorMatching } from "../types";
 interface Props {
   matching: TutorMatching;
   defaultFee: number;
+  lessonPrices?: Array<{ className?: string; price?: number }>;
   onClose: () => void;
   onSave: (id: number, fee: number) => void;
 }
@@ -19,7 +20,7 @@ function parse(s: string): number {
   return parseInt(s.replace(/,/g, ""), 10) || 0;
 }
 
-export default function LessonFeeModal({ matching, defaultFee, onClose, onSave }: Props) {
+export default function LessonFeeModal({ matching, defaultFee, lessonPrices = [], onClose, onSave }: Props) {
   const initial = matching.lessonFee ?? defaultFee;
   const [input, setInput] = useState(fmt(initial));
   const [saved, setSaved] = useState(false);
@@ -108,6 +109,31 @@ export default function LessonFeeModal({ matching, defaultFee, onClose, onSave }
               />
               <span className="text-base font-semibold text-muted-foreground shrink-0">원</span>
             </div>
+            {lessonPrices.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {lessonPrices.map((item, index) => (
+                  item.price !== undefined && item.price >= 0 ? (
+                    <button
+                      key={`${item.className ?? "레슨"}-${item.price}-${index}`}
+                      type="button"
+                      onClick={() => setInput(fmt(item.price ?? 0))}
+                      className="rounded-xl border border-border px-3 py-2 text-left hover:bg-muted/50 transition-colors cursor-pointer"
+                    >
+                      <span className="block text-xs text-muted-foreground">{item.className || "레슨"}</span>
+                      <span className="text-sm font-bold">{fmt(item.price)}원</span>
+                    </button>
+                  ) : null
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setInput("")}
+                  className="rounded-xl border border-border px-3 py-2 text-left hover:bg-muted/50 transition-colors cursor-pointer"
+                >
+                  <span className="block text-xs text-muted-foreground">직접 입력</span>
+                  <span className="text-sm font-bold">학생 맞춤 금액</span>
+                </button>
+              </div>
+            )}
             {fee > 0 && (
               <p className="text-xs text-muted-foreground px-1">
                 기본 금액 <span className="font-semibold text-foreground">{fmt(defaultFee)}원</span>에서 학생 맞춤으로

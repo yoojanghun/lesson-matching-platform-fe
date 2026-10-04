@@ -27,6 +27,7 @@ import { useSetMatchingPriceMutation, useUpdateMatchingStatusMutation } from "..
 import { useBookingsQuery } from "../hooks/queries/useBookings";
 import { useUpdateReservationStatusMutation } from "../hooks/queries/useBookings";
 import { usePaymentsQuery, usePayItemMutation, usePayAllMutation } from "../hooks/queries/usePayments";
+import { useTutorProfileQuery } from "../hooks/queries/useProfiles";
 import LoginGate from "../components/LoginGate";
 import Pagination from "../components/Pagination";
 import BookingPage from "./BookingPage";
@@ -132,6 +133,7 @@ export default function MyMatchingsPage() {
   const router = useRouter();
   const role = useUserStore((s) => s.role);
   const isTutor = role === "TUTOR";
+  const { data: tutorProfile } = useTutorProfileQuery(isTutor);
 
   const [requestsPage, setRequestsPage] = useState(0);
   const [bookingsPage, setBookingsPage] = useState(0);
@@ -1145,6 +1147,7 @@ export default function MyMatchingsPage() {
         <LessonFeeModal
           matching={feeModalTarget}
           defaultFee={feeModalTarget.lessonFee ?? 50000}
+          lessonPrices={tutorProfile?.prices}
           onClose={() => setFeeModalTarget(null)}
           onSave={(id, fee) => {
             setMatchingPriceMutation.mutate({ id, pricePerLesson: fee });
@@ -1166,7 +1169,14 @@ export default function MyMatchingsPage() {
             setApproveModalTarget(null);
           }}
           onApprove={(id) => {
-            updateMatchingStatusMutation.mutate({ id, status: "accepted" });
+            updateMatchingStatusMutation.mutate(
+              { id, status: "accepted" },
+              {
+                onSuccess: () => {
+                  setFeeModalTarget(approveModalTarget);
+                },
+              }
+            );
             setApproveModalTarget(null);
           }}
           onReject={(id) => {
