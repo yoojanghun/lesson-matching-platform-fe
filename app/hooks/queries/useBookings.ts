@@ -78,7 +78,11 @@ export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT', page = 0
               ? 'confirmed'
               : reservation.reservationStatus === 'REJECTED'
                 ? 'rejected'
-                : 'pending',
+                : reservation.reservationStatus === 'COMPLETED'
+                  ? 'completed'
+                  : reservation.reservationStatus === 'CANCELLED'
+                    ? 'cancelled'
+                    : 'pending',
             requestedAt: reservation.createdAt,
           })),
           totalPages,
@@ -126,7 +130,11 @@ export function useBookingsQuery(role: 'STUDENT' | 'TUTOR' = 'STUDENT', page = 0
             ? 'confirmed'
             : reservation.reservationStatus === 'REJECTED'
               ? 'rejected'
-              : 'pending',
+              : reservation.reservationStatus === 'COMPLETED'
+                ? 'completed'
+                : reservation.reservationStatus === 'CANCELLED'
+                  ? 'cancelled'
+                  : 'pending',
           requestedAt: reservation.createdAt,
         })),
         totalPages,
@@ -191,7 +199,7 @@ export function useUpdateReservationStatusMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { reservationId: number; status: 'confirmed' | 'rejected' }) =>
+    mutationFn: (payload: { reservationId: number; status: 'confirmed' | 'rejected' | 'completed' | 'cancelled' }) =>
       apiClient.patch(`/api/reservations/${payload.reservationId}/status`, {
         reservationStatus: payload.status.toUpperCase(),
       }),

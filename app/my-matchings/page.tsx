@@ -25,7 +25,8 @@ import { useUserStore } from "../store/useUserStore";
 import { useMatchingsQuery } from "../hooks/queries/useMatchings";
 import { useSetMatchingPriceMutation, useUpdateMatchingStatusMutation } from "../hooks/queries/useMatchings";
 import { useBookingsQuery } from "../hooks/queries/useBookings";
-import { useUpdateReservationStatusMutation } from "../hooks/queries/useBookings";
+import { useUpdateReservationStatusMutation, useCancelReservationMutation} from "../hooks/queries/useBookings";
+import { useUser } from "../components/UserContext";
 import { usePaymentsQuery, usePayItemMutation, usePayAllMutation } from "../hooks/queries/usePayments";
 import { useTutorProfileQuery } from "../hooks/queries/useProfiles";
 import LoginGate from "../components/LoginGate";
@@ -41,21 +42,25 @@ const ApproveRejectModal = dynamic(() => import("../components/ApproveRejectModa
 const TutorRevenuePanel = dynamic(() => import("../components/TutorRevenuePanel"), { ssr: false });
 const MiniCalendar = dynamic(() => import("../components/MiniCalendar"), { ssr: false });
 const SchedulePlanner = dynamic(() => import("../components/SchedulePlanner"), { ssr: false });
+const DirectLessonConfirmModal = dynamic(() => import("../components/DirectLessonConfirmModal"), { ssr: false });
+const DirectLessonSuccessModal = dynamic(() => import("../components/DirectLessonSuccessModal"), { ssr: false });
 
 function BookingStatusBadge({
   status,
 }: {
-  status: "pending" | "confirmed" | "rejected";
+  status: "pending" | "confirmed" | "rejected" | "completed" | "cancelled";
 }) {
   const map = {
     pending: { label: "대기 중", cls: "bg-amber-100 text-amber-700" },
     confirmed: { label: "확정됨", cls: "bg-emerald-100 text-emerald-700" },
     rejected: { label: "거절됨", cls: "bg-red-100 text-red-600" },
+    completed: { label: "완료됨", cls: "bg-blue-100 text-blue-700" },
+    cancelled: { label: "취소됨", cls: "bg-gray-100 text-gray-600" },
   };
   const { label, cls } = map[status];
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${cls}`}
+      className={`inline-flex items-center justify-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-semibold ${cls}`}
     >
       {label}
     </span>
@@ -152,6 +157,8 @@ export default function MyMatchingsPage() {
   const updateMatchingStatusMutation = useUpdateMatchingStatusMutation();
   const setMatchingPriceMutation = useSetMatchingPriceMutation();
   const updateReservationStatusMutation = useUpdateReservationStatusMutation();
+  const cancelReservationMutation = useCancelReservationMutation(); 
+const { showToast } = useUser(); 
 
   const matchings: StudentMatching[] = (matchingsData?.content as StudentMatching[]) ?? [];
   const bookings = bookingsData?.content ?? [];
@@ -221,7 +228,7 @@ export default function MyMatchingsPage() {
       startTime: booking.startTime,
       endTime: booking.endTime,
       price: booking.price,
-      status: booking.status === "confirmed" ? "confirmed" : booking.status === "rejected" ? "rejected" : "pending",
+      status: booking.status,
       requestedAt: booking.requestedAt,
       message: "예약 요청",
     })), [bookings]);
@@ -231,6 +238,13 @@ export default function MyMatchingsPage() {
   const [lessonReqPopup, setLessonReqPopup] = useState<string | null>(null);
   const [lessonReqModal, setLessonReqModal] =
     useState<TutorLessonRequest | null>(null);
+  const [directConfirmDate, setDirectConfirmDate] = useState<string | null>(null);
+  const [directSuccessInfo, setDirectSuccessInfo] = useState<{
+    studentName: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+  } | null>(null);
 
   const [bookingMatchingId, setBookingMatchingId] = useState<number | null>(
     null
@@ -256,7 +270,7 @@ export default function MyMatchingsPage() {
   ).length;
 
   const bookingEvents: CalEvent[] = lessonBookings
-    .filter((b) => b.status !== "rejected")
+    .filter((b) => ["confirmed", "pending", "completed"].includes(b.status))
     .map((b) => ({
       date: b.lessonDate,
       label: `${b.startTime} ${b.tutor}`,
@@ -329,7 +343,7 @@ export default function MyMatchingsPage() {
 
   // 튜터 레슨 예약 캘린더 이벤트
   const tutorLessonEvents: CalEvent[] = lessonRequests
-    .filter((r) => r.status !== "rejected")
+    .filter((r) => ["confirmed", "pending", "completed"].includes(r.status))
     .map((r) => ({
       date: r.lessonDate,
       label: `${r.startTime} ${r.student}`,
@@ -534,9 +548,6 @@ export default function MyMatchingsPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-bold text-foreground">{b.tutor}</p>
-                      <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">
-                        {b.subject}
-                      </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {fmtDate(b.lessonDate, b.lessonDay)}
@@ -550,7 +561,9 @@ export default function MyMatchingsPage() {
                   <p className="text-sm font-semibold text-primary">
                     {b.price.toLocaleString()}원
                   </p>
-                  <BookingStatusBadge status={b.status} />
+                  <div className="flex justify-end">
+                    <BookingStatusBadge status={b.status} />
+                  </div>
                 </div>
               ))
             )}
@@ -816,9 +829,6 @@ export default function MyMatchingsPage() {
                       <p className="text-sm font-bold text-foreground">
                         {r.student}
                       </p>
-                      <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">
-                        {r.subject}
-                      </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {fmtDate(r.lessonDate, r.lessonDay)}
@@ -832,16 +842,16 @@ export default function MyMatchingsPage() {
                   <div>
                     <BookingStatusBadge status={r.status} />
                   </div>
-                  <div className="flex justify-end">
+                  <div className="flex justify-center">
                     {r.status === "pending" ? (
                       <button
                         onClick={() => setLessonReqModal(r)}
-                        className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
+                        className="w-16 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer shadow-xs text-center"
                       >
                         검토하기
                       </button>
                     ) : (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="w-16 text-center text-xs text-muted-foreground">
                         {r.status === "confirmed" ? "승인됨" : "거절됨"}
                       </span>
                     )}
@@ -881,7 +891,12 @@ export default function MyMatchingsPage() {
       {lessonReqPopup && (() => {
         const [py, pm, pd] = lessonReqPopup.split("-").map(Number);
         const dow = WDAYS[new Date(lessonReqPopup).getDay()];
-        const items = lessonRequests.filter((r) => r.lessonDate === lessonReqPopup);
+        const items = lessonRequests.filter(
+          (r) =>
+            r.lessonDate === lessonReqPopup &&
+            r.status !== "cancelled" &&
+            r.status !== "rejected"
+        );
         return (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
@@ -918,7 +933,7 @@ export default function MyMatchingsPage() {
                       i !== items.length - 1 ? "border-b border-border" : ""
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center justify-between gap-3 mb-2">
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
                           <User size={16} className="text-primary" />
@@ -927,9 +942,6 @@ export default function MyMatchingsPage() {
                           <p className="text-sm font-bold text-foreground">
                             {r.student}
                           </p>
-                          <span className="text-[11px] text-muted-foreground">
-                            {r.subject}
-                          </span>
                         </div>
                       </div>
                       <BookingStatusBadge status={r.status} />
@@ -937,25 +949,101 @@ export default function MyMatchingsPage() {
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
                       <Clock size={11} /> {r.startTime} – {r.endTime}
                     </p>
-                    {r.message && (
-                      <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 mt-2 leading-relaxed border border-border/50">
-                        {r.message}
-                      </p>
-                    )}
+
+                    {/* 대기 중인 예약일 때: 검토하기 버튼 및 요청 메시지 */}
                     {r.status === "pending" && (
-                      <button
-                        onClick={() => {
-                          setLessonReqModal(r);
-                          setLessonReqPopup(null);
-                        }}
-                        className="mt-3 w-full py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors cursor-pointer shadow-sm"
-                      >
-                        검토하기
-                      </button>
+                      <>
+                        {r.message && r.message !== "예약 요청" && (
+                          <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 mt-2 leading-relaxed border border-border/50">
+                            {r.message}
+                          </p>
+                        )}
+                        <button
+                          onClick={() => {
+                            setLessonReqModal(r);
+                            setLessonReqPopup(null);
+                          }}
+                          className="mt-3 w-full py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors cursor-pointer shadow-sm"
+                        >
+                          검토하기
+                        </button>
+                      </>
                     )}
+
+                    {/* 확정된(confirmed) 레슨일 때: 레슨 완료 및 예약 취소 버튼 */}
+                    {r.status === "confirmed" && (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => {
+                            if (window.confirm("해당 레슨을 완료(COMPLETED) 처리하시겠습니까?")) {
+                              updateReservationStatusMutation.mutate(
+                                { reservationId: r.id, status: "completed" },
+                                {
+                                  onSuccess: () => {
+                                    showToast("레슨이 완료 처리되었습니다.");
+                                    setLessonReqPopup(null);
+                                  },
+                                  onError: (err: any) => {
+                                    const msg = err.response?.data?.message || "수업 종료 시간 이후에만 완료 처리할 수 있습니다.";
+                                    showToast(msg);
+                                  },
+                                }
+                              );
+                            }
+                          }}
+                          className="py-2 px-3 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors cursor-pointer shadow-xs text-center"
+                        >
+                          레슨 완료
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm("확정된 레슨을 정말 취소하시겠습니까?")) {
+                              cancelReservationMutation.mutate(r.id, {
+                                onSuccess: () => {
+                                  showToast("레슨이 취소되었습니다.");
+                                  setLessonReqPopup(null);
+                                },
+                                onError: () => {
+                                  showToast("레슨 취소에 실패했습니다.");
+                                },
+                              });
+                            }
+                          }}
+                          className="py-2 px-3 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors cursor-pointer text-center"
+                        >
+                          확정 레슨 취소
+                        </button>
+                      </div>
+                    )}
+
                   </div>
                 ))
               )}
+
+              {/* 하단: 학생과 수업을 잡으셨나요? 직접 확정 배너 */}
+              <div className="p-4 border-t border-border bg-muted/20">
+                <div className="flex items-center justify-between gap-3 p-3.5 bg-sky-50/60 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/40 rounded-2xl">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-foreground tracking-tight">
+                      학생과 수업을 잡으셨나요?
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      요청 없이도 바로 일정을 등록할 수 있어요.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const curDate = lessonReqPopup;
+                      setLessonReqPopup(null);
+                      setDirectConfirmDate(curDate);
+                    }}
+                    className="shrink-0 px-3.5 py-2 bg-white dark:bg-card border border-sky-200 dark:border-sky-800 text-sky-900 dark:text-sky-300 rounded-xl text-xs font-bold hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
+                  >
+                    수업 직접 확정
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -1013,9 +1101,6 @@ export default function MyMatchingsPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-bold text-foreground">{b.tutor}</p>
-                          <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">
-                            {b.subject}
-                          </span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                           <Clock size={11} /> {b.startTime} – {b.endTime}
@@ -1209,6 +1294,34 @@ export default function MyMatchingsPage() {
           onReject={(id) => {
             updateReservationStatusMutation.mutate({ reservationId: id, status: "rejected" });
             setLessonReqModal(null);
+          }}
+        />
+      )}
+      {/* 수업 직접 확정 모달 (학생 선택 & 시간 선택) */}
+      {directConfirmDate && (
+        <DirectLessonConfirmModal
+          date={directConfirmDate}
+          matchings={tutorMatchings.filter((m) => m.status === 'accepted')}
+          onClose={() => setDirectConfirmDate(null)}
+          onSuccess={(info) => {
+            setDirectConfirmDate(null);
+            setDirectSuccessInfo(info);
+          }}
+        />
+      )}
+
+      {/* 수업 직접 확정 완료 모달 */}
+      {directSuccessInfo && (
+        <DirectLessonSuccessModal
+          studentName={directSuccessInfo.studentName}
+          date={directSuccessInfo.date}
+          startTime={directSuccessInfo.startTime}
+          endTime={directSuccessInfo.endTime}
+          onClose={() => {
+            const confirmedDate = directSuccessInfo.date;
+            setDirectSuccessInfo(null);
+            setLessonReqSelDate(confirmedDate);
+            setLessonReqPopup(confirmedDate);
           }}
         />
       )}

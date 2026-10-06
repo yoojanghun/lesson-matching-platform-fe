@@ -13,7 +13,7 @@ interface CalendarLesson {
   startTime: string;
   endTime: string;
   payStatus?: "paid" | "unpaid";
-  bookStatus?: "confirmed" | "pending" | "rejected";
+  bookStatus?: "confirmed" | "pending" | "rejected" | "completed" | "cancelled";
   source: "payment" | "booking";
 }
 

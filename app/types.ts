@@ -132,7 +132,7 @@ export interface TutorLessonRequest {
   startTime: string;
   endTime: string;
   price: number;
-  status: "pending" | "confirmed" | "rejected";
+  status: "pending" | "confirmed" | "rejected" | "completed" | "cancelled";
   requestedAt: string;
   message: string;
 }
@@ -161,7 +161,7 @@ export interface LessonBooking {
   startTime: string;       // "10:30"
   endTime: string;         // "11:30"
   price: number;
-  status: "pending" | "confirmed" | "rejected";
+  status: "pending" | "confirmed" | "rejected" | "completed" | "cancelled";
   requestedAt: string;     // 예약 신청 일시
 }
 

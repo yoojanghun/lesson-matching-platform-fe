@@ -175,7 +175,7 @@ export default function TutorStudentDetailPage({ matching, onBack, onUpdateFee }
 
   const calEvents: CalEvent[] = lessons.map((l) => ({
     date: l.lessonDate,
-    label: `${l.startTime} 레슨`,
+    label: l.startTime,
     color: l.paid ? "green" : "amber",
   }));
 
