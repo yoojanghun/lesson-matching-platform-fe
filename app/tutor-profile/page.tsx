@@ -24,7 +24,7 @@ import { useUserStore } from '../store/useUserStore';
 import LoginGate from '../components/LoginGate';
 import type { TutorProfileData, BulletEntry, FeeEntry } from '../types';
 import { useCategoriesQuery } from '../hooks/queries/useCategories';
-import { useSaveTutorProfileMutation, useTutorProfileQuery } from '../hooks/queries/useProfiles';
+import { useSaveTutorProfileMutation, useTutorProfileQuery, useUpdateBankAccountMutation } from '../hooks/queries/useProfiles';
 import { useReferencesQuery } from '../hooks/queries/useReferences';
 
 /* ── 선택지 ── */
@@ -160,6 +160,9 @@ interface PendingTutorProfileEdit {
   styleIds?: number[];
   goalIds?: number[];
   prices?: Array<{ className: string; price: number }>;
+  bankName?: string;
+  bankAccountHolder?: string;
+  bankAccountNumber?: string;
 }
 
 export default function TutorProfilePage() {
@@ -173,6 +176,7 @@ export default function TutorProfilePage() {
   const saveTutorProfile = useUserStore((state) => state.saveTutorProfile);
   const profileQuery = useTutorProfileQuery(role === 'TUTOR');
   const saveProfileMutation = useSaveTutorProfileMutation();
+  const updateBankAccountMutation = useUpdateBankAccountMutation();
 
   /* 기본 정보 */
   const [name, setName] = useState(userName || "");
@@ -214,6 +218,11 @@ export default function TutorProfilePage() {
   const [title, setTitle] = useState("");
   const [intro, setIntro] = useState("");
 
+  /* 계좌 정보 */
+  const [bankName, setBankName] = useState("");
+  const [bankAccountHolder, setBankAccountHolder] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+
   /* 저장 */
   const [saved, setSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -250,6 +259,9 @@ export default function TutorProfilePage() {
         setLessonType(savedProfile.lessonType || "");
         setTitle(savedProfile.title || "");
         setIntro(savedProfile.intro || "");
+        if (savedProfile.bankName) setBankName(savedProfile.bankName);
+        if (savedProfile.bankAccountHolder) setBankAccountHolder(savedProfile.bankAccountHolder);
+        if (savedProfile.bankAccountNumber) setBankAccountNumber(savedProfile.bankAccountNumber);
       });
     }
   }, [savedProfile]);
@@ -279,6 +291,9 @@ export default function TutorProfilePage() {
       setTeachNote(profile.content ?? '');
       setTitle(profile.title ?? '');
       setIntro(profile.introduction ?? '');
+      setBankName(profile.bankName ?? '');
+      setBankAccountHolder(profile.bankAccountHolder ?? '');
+      setBankAccountNumber(profile.bankAccountNumber ?? '');
       if (profile.educations?.length) {
         setEducations(profile.educations.map((text, index) => ({ id: index + 1, text })));
       }
@@ -405,6 +420,9 @@ export default function TutorProfilePage() {
         className: fee.type.trim(),
         price: Number(fee.price.replace(/,/g, '')) || 0,
       })),
+      bankName: bankName,
+      bankAccountHolder: bankAccountHolder,
+      bankAccountNumber: bankAccountNumber,
     };
 
     sessionStorage.setItem('pending-tutor-profile-edit', JSON.stringify(draft));
@@ -440,6 +458,9 @@ export default function TutorProfilePage() {
       teachNote,
       lessonType,
       intro,
+      bankName,
+      bankAccountHolder,
+      bankAccountNumber,
     };
 
     const finalCategoryIds = pendingCategoryIds ?? (
@@ -475,15 +496,25 @@ export default function TutorProfilePage() {
       introduction: intro || undefined,
     }, {
       onSuccess: () => {
-        sessionStorage.removeItem('pending-tutor-profile-edit');
-        sessionStorage.removeItem('pending-tutor-profile-edit-return');
-        setPendingCategoryIds(null);
-        setPendingSubjectIds(null);
-        setPendingLocationIds(null);
-        saveTutorProfile(profileData);
-        setSaved(true);
-        setIsEditing(false);
-        setTimeout(() => setSaved(false), 2000);
+        if (bankName && bankAccountHolder && bankAccountNumber) {
+          updateBankAccountMutation.mutate({ bankName, bankAccountHolder, bankAccountNumber }, {
+            onSuccess: finishSave
+          });
+        } else {
+          finishSave();
+        }
+
+        function finishSave() {
+          sessionStorage.removeItem('pending-tutor-profile-edit');
+          sessionStorage.removeItem('pending-tutor-profile-edit-return');
+          setPendingCategoryIds(null);
+          setPendingSubjectIds(null);
+          setPendingLocationIds(null);
+          saveTutorProfile(profileData);
+          setSaved(true);
+          setIsEditing(false);
+          setTimeout(() => setSaved(false), 2000);
+        }
       },
     });
   };
@@ -607,6 +638,14 @@ export default function TutorProfilePage() {
         </ProfileSection>
         <ProfileSection icon="✨" title="수업 스타일" onEdit={() => editSection('styles')}>{teachStyles.length ? <div className="flex flex-wrap gap-2">{teachStyles.map((item) => <span key={item} className="rounded-full border-2 border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700">{item}</span>)}</div> : empty('선택된 수업 스타일이 없습니다.')}</ProfileSection>
         <ProfileSection icon="💰" title="레슨 가격" onEdit={() => editSection('prices')}>{feeItems.length ? <div className="space-y-3">{feeItems.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3"><span className="text-sm font-semibold text-foreground">{item.type}</span><span className="text-sm font-bold text-accent">{Number(item.price.replace(/,/g, '')).toLocaleString('ko-KR')}원 / {item.duration}</span></div>)}</div> : empty('등록된 레슨 가격이 없습니다.')}</ProfileSection>
+        <ProfileSection icon="🏦" title="정산 계좌 정보" onEdit={() => editSection('bank')}>
+          {bankName && bankAccountNumber ? (
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">{bankName} {bankAccountNumber}</p>
+              <p className="text-xs text-muted-foreground">예금주: {bankAccountHolder}</p>
+            </div>
+          ) : empty('등록된 정산 계좌 정보가 없습니다.')}
+        </ProfileSection>
         <button type="button" onClick={saveProfile} disabled={saveProfileMutation.isPending} className="w-full rounded-2xl bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-md transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer">{saveProfileMutation.isPending ? '저장 중...' : saved ? '프로필 저장 완료!' : '프로필 저장'}</button>
         <p className="pb-4 text-center text-xs text-muted-foreground">프로필은 언제든지 수정할 수 있습니다.</p>
       </div>
@@ -652,6 +691,9 @@ export default function TutorProfilePage() {
       teachNote,
       lessonType,
       intro,
+      bankName,
+      bankAccountHolder,
+      bankAccountNumber,
     };
     saveProfileMutation.mutate({
       name: name || undefined,
@@ -676,10 +718,20 @@ export default function TutorProfilePage() {
       introduction: intro || undefined,
     }, {
       onSuccess: () => {
-        saveTutorProfile(profileData);
-        setSaved(true);
-        setIsEditing(false);
-        setTimeout(() => setSaved(false), 2000);
+        if (bankName && bankAccountHolder && bankAccountNumber) {
+          updateBankAccountMutation.mutate({ bankName, bankAccountHolder, bankAccountNumber }, {
+            onSuccess: finishSave
+          });
+        } else {
+          finishSave();
+        }
+
+        function finishSave() {
+          saveTutorProfile(profileData);
+          setSaved(true);
+          setIsEditing(false);
+          setTimeout(() => setSaved(false), 2000);
+        }
       },
     });
   };

@@ -67,6 +67,9 @@ export interface TutorProfileResponse {
   subjects: ProfileSubjectDto[];
   styles: ProfileTypeDto[];
   goals?: ProfileTypeDto[];
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountHolder?: string | null;
 }
 
 export interface StudentProfilePatchRequest {
@@ -137,6 +140,18 @@ export function useSaveTutorProfileMutation() {
   return useMutation({
     mutationFn: (request: TutorProfilePatchRequest) =>
       apiClient.patch('/api/profile/tutor/me', request).then(() => request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.profiles.tutor });
+    },
+  });
+}
+
+export function useUpdateBankAccountMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: { bankName: string; bankAccountNumber: string; bankAccountHolder: string }) =>
+      apiClient.put('/api/payments/bank-account', request).then(() => request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.profiles.tutor });
     },

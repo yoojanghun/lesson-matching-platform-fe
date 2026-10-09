@@ -10,6 +10,7 @@ import { useLocationsQuery, useReferencesQuery } from '../../hooks/queries/useRe
 import { useTutorProfileQuery } from '../../hooks/queries/useProfiles';
 import CategoryIcon from '../../components/CategoryIcon';
 import { useUser } from '../../components/UserContext';
+import { useUpdateBankAccountMutation } from '../../hooks/queries/useProfiles';
 
 interface PendingTutorSignup {
   name: string;
@@ -36,7 +37,25 @@ interface PendingTutorProfileEdit {
   styleIds?: number[];
   goalIds?: number[];
   prices?: Array<{ className: string; price: number }>;
+  bankName?: string;
+  bankAccountHolder?: string;
+  bankAccountNumber?: string;
 }
+
+const BANKS = [
+  '국민은행',
+  '신한은행',
+  '우리은행',
+  '하나은행',
+  'NH농협은행',
+  'IBK기업은행',
+  '카카오뱅크',
+  '토스뱅크',
+  '케이뱅크',
+  'SC제일은행',
+  '씨티은행',
+  '우체국',
+];
 
 const GOAL_DESCRIPTIONS: Record<string, string> = {
   HOBBY: '즐기기 위해 배우고 싶어요',
@@ -74,13 +93,15 @@ function TutorProfileSetupContent() {
             : editSection === 'goals' ? 8
               : editSection === 'styles' ? 9
                 : editSection === 'prices' ? 10
-                  : 1;
+                  : editSection === 'bank' ? 11
+                    : 1;
   const { data: categories, isLoading: categoriesLoading, isError: categoriesError } = useCategoriesQuery();
   const tutorProfileQuery = useTutorProfileQuery(editMode);
+  const updateBankAccountMutation = useUpdateBankAccountMutation();
   const { data: references, isLoading: referencesLoading, isError: referencesError } = useReferencesQuery();
   const { data: fallbackLocations = [], isLoading: fallbackLocationsLoading, isError: fallbackLocationsError } = useLocationsQuery(referencesError);
   const locations = references?.locations ?? fallbackLocations;
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10>(initialStep as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11>(initialStep as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [selectedSubjects, setSelectedSubjects] = useState<number[]>([]);
@@ -100,6 +121,9 @@ function TutorProfileSetupContent() {
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [priceName, setPriceName] = useState('');
   const [priceValue, setPriceValue] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAccountHolder, setBankAccountHolder] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -170,6 +194,16 @@ function TutorProfileSetupContent() {
             name: price.className ?? '',
             price: String(price.price ?? ''),
           })));
+        }
+        
+        if (existingDraft?.bankName !== undefined) {
+          setBankName(existingDraft.bankName);
+          setBankAccountHolder(existingDraft.bankAccountHolder || '');
+          setBankAccountNumber(existingDraft.bankAccountNumber || '');
+        } else {
+          setBankName(profile.bankName ?? '');
+          setBankAccountHolder(profile.bankAccountHolder ?? '');
+          setBankAccountNumber(profile.bankAccountNumber ?? '');
         }
       }
     });
@@ -252,6 +286,18 @@ function TutorProfileSetupContent() {
       return;
     }
 
+    if (!bankName || !bankAccountHolder.trim() || !bankAccountNumber) {
+      setErrorMessage('은행, 예금주, 계좌번호를 모두 입력해 주세요.');
+      setStep(11);
+      return;
+    }
+
+    const bankAccount = {
+      bankName,
+      bankAccountHolder: bankAccountHolder.trim(),
+      bankAccountNumber,
+    };
+
     if (fromMode === 'oauth' || fromMode === 'switch') {
       setSubmitting(true);
       const endpoint = fromMode === 'switch' ? '/api/sign-up/tutor-switch' : '/api/sign-up/tutor-from-guest';
@@ -271,6 +317,7 @@ function TutorProfileSetupContent() {
             className: name.trim(),
             price: Number(price),
           })),
+          ...bankAccount,
         });
         if (res.data?.accessToken) {
           localStorage.setItem('tm_token', res.data.accessToken);
@@ -319,6 +366,7 @@ function TutorProfileSetupContent() {
           className: name.trim(),
           price: Number(price),
         })),
+        ...bankAccount,
       });
       sessionStorage.removeItem('pending-tutor-signup');
       alert('튜터 회원가입이 완료되었습니다. 로그인해 주세요.');
@@ -331,7 +379,38 @@ function TutorProfileSetupContent() {
     }
   };
 
-  const handleStepAction = (nextStep: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) => {
+  const handleBankEditSubmit = () => {
+    setSubmitting(true);
+    updateBankAccountMutation.mutate(
+      { bankName, bankAccountHolder, bankAccountNumber },
+      {
+        onSuccess: () => {
+          let existingDraft: PendingTutorProfileEdit = {};
+          try {
+            const raw = sessionStorage.getItem('pending-tutor-profile-edit');
+            if (raw) existingDraft = JSON.parse(raw);
+          } catch {
+            existingDraft = {};
+          }
+          sessionStorage.setItem('pending-tutor-profile-edit', JSON.stringify({
+            ...existingDraft,
+            bankName,
+            bankAccountHolder,
+            bankAccountNumber,
+          }));
+          sessionStorage.setItem('pending-tutor-profile-edit-return', 'true');
+          router.push('/tutor-profile');
+        },
+        onError: (error) => {
+          const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
+          setErrorMessage(response?.data?.message ?? response?.data?.error ?? '계좌 정보 저장 중 오류가 발생했습니다. 다시 시도해 주세요.');
+          setSubmitting(false);
+        }
+      }
+    );
+  };
+
+  const handleStepAction = (nextStep: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) => {
     if (profileEditMode) {
       let existingDraft: PendingTutorProfileEdit = {};
       try {
@@ -438,8 +517,8 @@ function TutorProfileSetupContent() {
     }));
   const hasLocationGroups = locationGroups.length > 0;
 
-  const stepLabels = ['악기 선택', '악기 세부', '레슨 소개', '학력', '경력', '수업 방식', '레슨 지역', '레슨 목표', '수업 스타일', '레슨 가격'];
-  const visibleStepStart = step <= 3 ? 0 : step >= 9 ? 7 : step >= 8 ? 6 : step >= 6 ? 4 : 1;
+  const stepLabels = ['악기 선택', '악기 세부', '레슨 소개', '학력', '경력', '수업 방식', '레슨 지역', '레슨 목표', '수업 스타일', '레슨 가격', '계좌 정보'];
+  const visibleStepStart = step <= 3 ? 0 : step >= 9 ? 8 : step >= 8 ? 6 : step >= 6 ? 4 : 1;
   const visibleSteps = stepLabels.slice(visibleStepStart, visibleStepStart + 3);
 
   return (
@@ -857,7 +936,7 @@ function TutorProfileSetupContent() {
           {referencesError && <p className="mt-5 text-sm text-red-500">수업 스타일을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>}
           <div className="mt-9 flex gap-3"><button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(8)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{editMode ? '돌아가기' : '이전'}</button><button type="button" onClick={() => handleStepAction(10)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">{profileEditMode ? '수정 완료' : '다음'}</button></div>
         </section>
-      ) : (
+      ) : step === 10 ? (
         <section className="relative">
           {priceModalOpen && (
             <>
@@ -921,10 +1000,43 @@ function TutorProfileSetupContent() {
             )}
 
             {lessonPrices.length === 3 && <p className="mt-4 text-center text-xs text-muted-foreground">최대 3개까지 등록 가능합니다. (3/3)</p>}
-            <div className="mt-9 flex gap-3"><button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(9)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{editMode ? '돌아가기' : '이전'}</button><button type="button" disabled={submitting} onClick={profileEditMode ? () => handleStepAction(10) : finishSetup} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">{submitting ? '저장 중...' : profileEditMode ? '수정 완료' : '등록 완료'}</button></div>
+            <div className="mt-9 flex gap-3"><button type="button" onClick={() => editMode ? leaveEditPage('/tutor-profile') : setStep(9)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{editMode ? '돌아가기' : '이전'}</button><button type="button" onClick={() => profileEditMode ? handleStepAction(10) : handleStepAction(11)} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 cursor-pointer">{profileEditMode ? '수정 완료' : '다음'}</button></div>
           </div>
         </section>
-      )}
+      ) : step === 11 ? (
+        <section>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">정산 계좌 정보를 입력해주세요</h1>
+          <p className="mt-2 text-sm text-muted-foreground">레슨비를 정산받을 본인 명의의 계좌를 등록해주세요.</p>
+
+          <div className="mt-7 space-y-5 rounded-2xl border-2 border-border bg-card p-6 shadow-sm sm:p-7">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label htmlFor="bank-name" className="mb-2 block text-sm font-semibold text-foreground">은행명<span className="text-red-500"> *</span></label>
+                <select id="bank-name" required value={bankName} onChange={(event) => setBankName(event.target.value)} className="h-13 w-full rounded-xl border-2 border-border bg-card px-4 text-sm text-foreground outline-none focus:border-accent">
+                  <option value="">은행을 선택해 주세요</option>
+                  {BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="bank-account-holder" className="mb-2 block text-sm font-semibold text-foreground">예금주<span className="text-red-500"> *</span></label>
+                <input id="bank-account-holder" required value={bankAccountHolder} onChange={(event) => setBankAccountHolder(event.target.value)} placeholder="예금주 이름을 입력해 주세요" className="h-13 w-full rounded-xl border-2 border-border bg-card px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-accent" />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="bank-account-number" className="mb-2 block text-sm font-semibold text-foreground">계좌번호<span className="text-red-500"> *</span></label>
+              <input id="bank-account-number" required inputMode="numeric" value={bankAccountNumber} onChange={(event) => setBankAccountNumber(event.target.value.replace(/[^0-9-]/g, ''))} placeholder="숫자만 입력해 주세요" className="h-13 w-full rounded-xl border-2 border-border bg-card px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-accent" />
+            </div>
+            <div className="border-t border-border pt-5 text-xs text-muted-foreground">
+              <p>ⓘ 안전한 정산을 위해 선생님 본인 명의의 계좌만 등록할 수 있습니다.</p>
+            </div>
+          </div>
+
+          <div className="mt-9 flex gap-3">
+            <button type="button" onClick={() => profileEditMode ? leaveEditPage('/tutor-profile') : setStep(10)} className="flex-1 rounded-xl border-2 border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted cursor-pointer">{profileEditMode ? '돌아가기' : '이전'}</button>
+            <button type="button" disabled={submitting || !bankName || !bankAccountHolder.trim() || !bankAccountNumber} onClick={profileEditMode ? handleBankEditSubmit : finishSetup} className="flex-[1.8] rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">{submitting ? '저장 중...' : (profileEditMode ? '수정 완료' : '등록 완료')}</button>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

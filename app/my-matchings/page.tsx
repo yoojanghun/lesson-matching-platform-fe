@@ -27,7 +27,7 @@ import { useSetMatchingPriceMutation, useUpdateMatchingStatusMutation } from "..
 import { useBookingsQuery } from "../hooks/queries/useBookings";
 import { useUpdateReservationStatusMutation, useCancelReservationMutation} from "../hooks/queries/useBookings";
 import { useUser } from "../components/UserContext";
-import { usePaymentsQuery, usePayItemMutation, usePayAllMutation } from "../hooks/queries/usePayments";
+import { usePaymentsQuery, usePreparePaymentMutation, useClaimTransferMutation, useCancelPaymentByStudentMutation, usePayItemMutation, usePayAllMutation } from "../hooks/queries/usePayments";
 import { useTutorProfileQuery } from "../hooks/queries/useProfiles";
 import LoginGate from "../components/LoginGate";
 import Pagination from "../components/Pagination";
@@ -44,6 +44,8 @@ const MiniCalendar = dynamic(() => import("../components/MiniCalendar"), { ssr: 
 const SchedulePlanner = dynamic(() => import("../components/SchedulePlanner"), { ssr: false });
 const DirectLessonConfirmModal = dynamic(() => import("../components/DirectLessonConfirmModal"), { ssr: false });
 const DirectLessonSuccessModal = dynamic(() => import("../components/DirectLessonSuccessModal"), { ssr: false });
+const PaymentDetailModal = dynamic(() => import("../components/PaymentDetailModal"), { ssr: false });
+import type { PaymentDetailData } from "../components/PaymentDetailModal";
 
 function BookingStatusBadge({
   status,
@@ -152,6 +154,9 @@ export default function MyMatchingsPage() {
   );
   const { data: bookingsData } = useBookingsQuery(isTutor ? "TUTOR" : "STUDENT", bookingsPage, 10);
   const { data: paymentsData } = usePaymentsQuery(paymentsPage, 10);
+  const preparePaymentMutation = usePreparePaymentMutation();
+  const claimTransferMutation = useClaimTransferMutation();
+  const cancelPaymentByStudentMutation = useCancelPaymentByStudentMutation();
   const payItemMutation = usePayItemMutation();
   const payAllMutation = usePayAllMutation();
   const updateMatchingStatusMutation = useUpdateMatchingStatusMutation();
@@ -250,6 +255,35 @@ const { showToast } = useUser();
     null
   );
   const [payingItem, setPayingItem] = useState<PaymentItem | null>(null);
+  const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<PaymentDetailData | null>(null);
+  const [claimedPaymentIds, setClaimedPaymentIds] = useState<Record<string | number, string>>({});
+
+  const openPaymentDetail = (p: PaymentItem) => {
+    setSelectedPaymentDetail({
+      paymentId: typeof p.id === "number" ? p.id : undefined,
+      orderId: p.orderId || `LP-${p.id}`,
+      matchingId: p.matchingId,
+      tutorName: p.tutor,
+      amount: p.price,
+      lessonCount: 1,
+      status: p.status === "paid" ? "paid" : p.status === "claimed" ? "claimed" : "unpaid",
+      bankName: "국민은행",
+      bankAccountNumber: "948502-01-284910",
+      bankAccountHolder: p.tutor,
+      createdAt: p.lessonDate ? `${p.lessonDate} ${p.startTime}` : undefined,
+      transferClaimedAt: p.transferClaimedAt || (p.status === "claimed" ? (p.paidAt || "2026-10-08 14:42:18") : undefined),
+      confirmedAt: p.status === "paid" ? (p.paidAt || `${p.lessonDate} 21:05`) : undefined,
+      reservations: [
+        {
+          reservationId: typeof p.id === "number" ? p.id : undefined,
+          lessonDate: p.lessonDate,
+          startTime: p.startTime,
+          endTime: p.endTime,
+          price: p.price,
+        },
+      ],
+    });
+  };
 
   const [bookingSelDate, setBookingSelDate] = useState<string | null>(todayStr);
   const [bookingPopup, setBookingPopup] = useState<string | null>(null);
@@ -258,7 +292,52 @@ const { showToast } = useUser();
 
   const sentMatchings = matchings;
   const lessonBookings = bookings;
-  const unpaidPayments = useMemo(() => payments.filter((p) => p.status === "unpaid"), [payments]);
+
+  // 선생님이 "레슨 완료" 처리한(completed) 수업 중 아직 payment 항목에 없는 수업들을 미결제 결제 항목으로 통합
+  const displayPayments = useMemo(() => {
+    const list: PaymentItem[] = [...payments];
+
+    lessonBookings
+      .filter((b) => b.status === "completed" || b.status === "confirmed")
+      .forEach((b) => {
+        // 동일 날짜, 시간, 튜터명으로 이미 존재하는지 중복 체크
+        const alreadyExists = list.some(
+          (p) =>
+            p.lessonDate === b.lessonDate &&
+            p.startTime === b.startTime &&
+            p.tutor === b.tutor
+        );
+
+        if (!alreadyExists) {
+          list.push({
+            id: b.id,
+            tutor: b.tutor,
+            subject: b.subject,
+            avatar: b.avatar,
+            lessonDate: b.lessonDate,
+            lessonDay: b.lessonDay,
+            startTime: b.startTime,
+            endTime: b.endTime,
+            price: b.price,
+            status: "unpaid",
+          });
+        }
+      });
+
+    return list.map((p) => {
+      const isClaimedInState = Boolean(claimedPaymentIds[p.id] || (p.orderId && claimedPaymentIds[p.orderId]));
+      if (p.status !== "paid" && isClaimedInState) {
+        return {
+          ...p,
+          status: "claimed" as const,
+          transferClaimedAt: claimedPaymentIds[p.id] || (p.orderId ? claimedPaymentIds[p.orderId] : undefined),
+        };
+      }
+      return p;
+    });
+  }, [payments, lessonBookings, claimedPaymentIds]);
+
+  const unpaidPayments = useMemo(() => displayPayments.filter((p) => p.status === "unpaid"), [displayPayments]);
   const unpaidCount = unpaidPayments.length;
   const unpaidTotal = unpaidPayments.reduce((sum, p) => sum + p.price, 0);
 
@@ -277,7 +356,7 @@ const { showToast } = useUser();
       color: b.status === "confirmed" ? "blue" : "amber",
     }));
 
-  const paymentEvents: CalEvent[] = payments.map((p) => ({
+  const paymentEvents: CalEvent[] = displayPayments.map((p) => ({
     date: p.lessonDate,
     label: `${p.startTime} ${p.tutor}`,
     color: p.status === "paid" ? "green" : "amber",
@@ -593,6 +672,7 @@ const { showToast } = useUser();
 
           <div className="flex items-center gap-4 px-1">
             <Legend cls="bg-emerald-100 text-emerald-700" label="결제 완료" />
+            <Legend cls="bg-blue-100 text-blue-700" label="확인 대기" />
             <Legend cls="bg-amber-100 text-amber-700" label="미결제" />
           </div>
 
@@ -602,7 +682,7 @@ const { showToast } = useUser();
                 전체 결제 내역
               </p>
             </div>
-            <div className="grid grid-cols-[44px_1fr_auto_auto_120px] items-center gap-x-4 px-5 py-2.5 border-b border-border bg-muted/30">
+            <div className="grid grid-cols-[44px_1fr_auto_auto_110px_20px] items-center gap-x-4 px-5 py-2.5 border-b border-border bg-muted/30">
               <span />
               <span className="text-[11px] font-semibold text-muted-foreground">
                 수업 정보
@@ -613,65 +693,64 @@ const { showToast } = useUser();
               <span className="text-[11px] font-semibold text-muted-foreground">
                 금액
               </span>
-              <span className="text-[11px] font-semibold text-muted-foreground">
+              <span className="text-[11px] font-semibold text-muted-foreground text-center">
                 결제 상태
               </span>
+              <span />
             </div>
-            {payments.map((p, i) => (
-              <div
-                key={p.id}
-                className={`grid grid-cols-[44px_1fr_auto_auto_120px] items-center gap-x-4 px-5 py-4 transition-colors ${
-                  i !== payments.length - 1 ? "border-b border-border" : ""
-                } ${p.status === "unpaid" ? "hover:bg-muted/20" : ""}`}
-              >
-                <ProfileAvatar
-                  src={p.avatar}
-                  alt={p.tutor}
-                  className="w-11 h-11 rounded-full object-cover shrink-0"
-                />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
+            {displayPayments.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-10">
+                결제할 레슨 내역이 없습니다.
+              </p>
+            ) : (
+              displayPayments.map((p, i) => (
+                <div
+                  key={p.id}
+                  onClick={() => openPaymentDetail(p)}
+                  className={`grid grid-cols-[44px_1fr_auto_auto_110px_20px] items-center gap-x-4 px-5 py-4 transition-colors cursor-pointer hover:bg-muted/30 ${
+                    i !== displayPayments.length - 1 ? "border-b border-border" : ""
+                  }`}
+                >
+                  <ProfileAvatar
+                    src={p.avatar}
+                    alt={p.tutor}
+                    className="w-11 h-11 rounded-full object-cover shrink-0"
+                  />
+                  <div className="min-w-0">
                     <p className="text-sm font-bold text-foreground">{p.tutor}</p>
-                    <span className="px-2 py-0.5 bg-muted rounded-full text-[11px] text-muted-foreground">
-                      {p.subject}
-                    </span>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {p.subject} · {fmtDate(p.lessonDate, p.lessonDay)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                      <Clock size={11} /> {p.startTime} – {p.endTime}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-foreground whitespace-nowrap">
+                    {p.price.toLocaleString()}원
+                  </p>
+                  <div className="flex justify-center">
+                    {p.status === "paid" ? (
+                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 whitespace-nowrap">
+                        결제 완료
+                      </span>
+                    ) : p.status === "claimed" ? (
+                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 whitespace-nowrap">
+                        확인 대기
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 whitespace-nowrap">
+                        미결제
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex justify-end text-muted-foreground/60">
+                    <ChevronRight size={16} />
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-medium text-foreground flex items-center gap-1 justify-end">
-                    <Calendar size={11} className="text-muted-foreground" />{" "}
-                    {fmtDate(p.lessonDate, p.lessonDay)}
-                  </p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end mt-0.5">
-                    <Clock size={11} /> {p.startTime} – {p.endTime}
-                  </p>
-                </div>
-                <p className="text-sm font-bold text-foreground whitespace-nowrap">
-                  {p.price.toLocaleString()}원
-                </p>
-                <div className="flex justify-start">
-                  {p.status === "paid" ? (
-                    <div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                        <CheckCircle2 size={11} /> 결제 완료
-                      </span>
-                      {p.paidAt && (
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          {p.paidAt}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setPayingItem(p)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      <CreditCard size={13} /> 결제하기
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           <Pagination
@@ -679,29 +758,6 @@ const { showToast } = useUser();
             totalPages={paymentsTotalPages}
             onPageChange={setPaymentsPage}
           />
-
-          {/* 미결제 배너 */}
-          {unpaidCount > 0 && (
-            <div className="flex items-center justify-between gap-3 bg-accent/10 border border-accent/20 rounded-2xl px-5 py-4 shadow-sm">
-              <div>
-                <p className="text-sm font-bold text-accent">
-                  미결제 수업 {unpaidCount}건
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  미결제 금액:{" "}
-                  <span className="font-semibold text-foreground">
-                    {unpaidTotal.toLocaleString()}원
-                  </span>
-                </p>
-              </div>
-              <button
-                onClick={() => payAllUnpaid()}
-                className="flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent/90 transition-colors cursor-pointer whitespace-nowrap shrink-0 shadow-sm"
-              >
-                <CreditCard size={15} /> 전체 결제
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -1122,7 +1178,7 @@ const { showToast } = useUser();
       {paymentPopup && (() => {
         const [py, pm, pd] = paymentPopup.split("-").map(Number);
         const dow = WDAYS[new Date(paymentPopup).getDay()];
-        const items = payments.filter((p) => p.lessonDate === paymentPopup);
+        const items = displayPayments.filter((p) => p.lessonDate === paymentPopup);
         return (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
@@ -1297,6 +1353,150 @@ const { showToast } = useUser();
           }}
         />
       )}
+      {/* 결제 상세 모달 (스크린샷 기반 슬라이드 드로어) */}
+      {selectedPaymentDetail && (
+        <PaymentDetailModal
+          detail={selectedPaymentDetail}
+          onClose={() => setSelectedPaymentDetail(null)}
+          onClaimTransfer={(orderId) => {
+            const nowTime = new Date().toLocaleTimeString("ko-KR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            const applyClaimedState = () => {
+              showToast("이체 완료 신고가 접수되었습니다. 선생님 확인 대기 중입니다.");
+              const paymentKey = selectedPaymentDetail.paymentId || selectedPaymentDetail.orderId || "";
+              if (paymentKey) {
+                setClaimedPaymentIds((prev) => ({
+                  ...prev,
+                  [paymentKey]: nowTime,
+                  ...(orderId ? { [orderId]: nowTime } : {}),
+                }));
+              }
+              setSelectedPaymentDetail((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      status: "claimed",
+                      transferClaimedAt: nowTime,
+                    }
+                  : null
+              );
+            };
+
+            const sendClaimRequest = (finalOrderId: string) => {
+              console.log("[Payment] 이체 완료 신고 전송 -> /api/payments/claim-transfer", { orderId: finalOrderId });
+              claimTransferMutation.mutate(finalOrderId, {
+                onSuccess: () => {
+                  applyClaimedState();
+                },
+                onError: (err: any) => {
+                  console.error("[Payment] 이체 완료 신고 실패:", err);
+                  const msg = err?.response?.data?.message || err?.message || "이체 완료 신고에 실패했습니다.";
+                  showToast(msg);
+                },
+              });
+            };
+
+            // 만약 실제 orderId가 아직 없는 건(예: LP-3 같은 임시 번호)이면 먼저 /api/payments/prepare 호출
+            const currentOrderId = orderId || selectedPaymentDetail.orderId;
+            const isTemporaryOrder = !currentOrderId || currentOrderId.startsWith("LP-");
+
+            if (isTemporaryOrder) {
+              const matchedMatching = matchings.find((m) => m.tutor === selectedPaymentDetail.tutorName) 
+                || matchings.find((m) => m.status === "accepted");
+              const targetMatchingId = selectedPaymentDetail.matchingId || matchedMatching?.id || 104;
+              const reservationIds = selectedPaymentDetail.reservations
+                ?.map((r) => r.reservationId)
+                .filter((id): id is number => typeof id === "number") || [];
+
+              if (reservationIds.length > 0) {
+                console.log("[Payment] 결제 준비 요청 전송 -> /api/payments/prepare", {
+                  matchingId: targetMatchingId,
+                  reservationId: reservationIds,
+                });
+
+                preparePaymentMutation.mutate(
+                  { matchingId: targetMatchingId, reservationId: reservationIds },
+                  {
+                    onSuccess: (prepared) => {
+                      console.log("[Payment] 결제 준비 완료:", prepared);
+                      setSelectedPaymentDetail((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              orderId: prepared.orderId,
+                              bankName: prepared.tutorBankName || prev.bankName,
+                              bankAccountNumber: prepared.tutorBankAccountNumber || prev.bankAccountNumber,
+                              bankAccountHolder: prepared.tutorBankAccountHolder || prev.bankAccountHolder,
+                            }
+                          : null
+                      );
+                      sendClaimRequest(prepared.orderId);
+                    },
+                    onError: (err: any) => {
+                      console.error("[Payment] 결제 준비(/prepare) 실패:", err);
+                      const msg = err?.response?.data?.message || err?.message || "결제 건 생성에 실패했습니다.";
+                      showToast(msg);
+                    },
+                  }
+                );
+                return;
+              }
+            }
+
+            if (currentOrderId) {
+              sendClaimRequest(currentOrderId);
+            } else {
+              showToast("결제 주문 정보를 찾을 수 없습니다.");
+            }
+          }}
+          onCancelTransfer={(orderId) => {
+            const applyUnpaidState = () => {
+              showToast("이체 완료 신고가 취소되었습니다. 다시 미결제 상태로 변경됩니다.");
+              const paymentKey = selectedPaymentDetail.paymentId || selectedPaymentDetail.orderId || "";
+              if (paymentKey) {
+                setClaimedPaymentIds((prev) => {
+                  const updated = { ...prev };
+                  delete updated[paymentKey];
+                  if (orderId) delete updated[orderId];
+                  return updated;
+                });
+              }
+              setSelectedPaymentDetail((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      status: "unpaid",
+                      transferClaimedAt: undefined,
+                    }
+                  : null
+              );
+            };
+
+            const targetOrderId = orderId || selectedPaymentDetail.orderId;
+            if (targetOrderId && !targetOrderId.startsWith("LP-")) {
+              console.log("[Payment] 이체 완료 신고 취소 전송 -> /api/payments/cancel-by-student", { orderId: targetOrderId });
+              cancelPaymentByStudentMutation.mutate(
+                { orderId: targetOrderId, cancelReason: "학생이 이체 신고를 취소했습니다." },
+                {
+                  onSuccess: () => {
+                    applyUnpaidState();
+                  },
+                  onError: (err: any) => {
+                    console.error("[Payment] 결제 취소 API 실패:", err);
+                    const msg = err?.response?.data?.message || err?.message || "신고 취소에 실패했습니다.";
+                    showToast(msg);
+                  },
+                }
+              );
+            } else {
+              applyUnpaidState();
+            }
+          }}
+        />
+      )}
+
       {/* 수업 직접 확정 모달 (학생 선택 & 시간 선택) */}
       {directConfirmDate && (
         <DirectLessonConfirmModal

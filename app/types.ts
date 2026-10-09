@@ -139,7 +139,10 @@ export interface TutorLessonRequest {
 
 export interface PaymentItem {
   id: number;
+  orderId?: string;
+  matchingId?: number;
   tutor: string;
+  studentName?: string;
   subject: string;
   avatar: string;
   lessonDate: string;   // "2026-07-28"
@@ -147,8 +150,10 @@ export interface PaymentItem {
   startTime: string;
   endTime: string;
   price: number;
-  status: "unpaid" | "paid";
+  status: "unpaid" | "paid" | "claimed";
+  paymentStatus?: string;
   paidAt?: string;
+  transferClaimedAt?: string;
 }
 
 export interface LessonBooking {
